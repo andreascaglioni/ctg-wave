@@ -1,0 +1,5 @@
+# Ignore cache directories and files
+__pycache__/
+*/__pycache__/
+
+tmp.py
