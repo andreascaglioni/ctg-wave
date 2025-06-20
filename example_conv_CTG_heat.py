@@ -28,7 +28,7 @@ if __name__ == "__main__":
     start_time = 0.0
     end_time = 1.
     boundary_D = lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))  # noqa: E731
-    from data.exact_solution_heat import (
+    from data.exact_solution_heat_2 import (
         exact_rhs,
         boundary_data,
         initial_data,
@@ -37,14 +37,14 @@ if __name__ == "__main__":
     
     # Numerics data
     comm = MPI.COMM_SELF
-    n_refs = 5  # number of refinement
+    n_refs = 6  # number of refinement
 
     # ---------------------- Ex 1: Space mesh refinement --------------------- #
-    # nn_x = 100 * 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
+    # nn_x = 10 * 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
     # pp_x = np.ones(n_refs, dtype=int)  # polynomial degree in space
     # tt_slab_size = end_time * np.ones(n_refs)
     # pp_t = np.ones(n_refs, dtype=int)
-    # nn_t = 320 * np.ones(n_refs, dtype=int)  # number of t elements per time-slab
+    # nn_t = 100 * np.ones(n_refs, dtype=int)  # number of t elements per time-slab
 
     # ---------------------- Ex. 2: Time mesh refinement --------------------- #
     nn_x = 3200 * np.ones(n_refs, dtype=int)
@@ -56,8 +56,8 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------ #
     #                             CONVERGENCE TEST                             #
     # ------------------------------------------------------------------------ #
-    e = np.zeros((n_refs))
-    re = np.zeros_like(e)
+    ee = np.zeros((n_refs))
+    rre = np.zeros_like(ee)
     nn_dofs = np.zeros(n_refs, dtype=int)
 
     for n_exp in range(n_refs):
@@ -98,37 +98,59 @@ if __name__ == "__main__":
         )
 
         # Current-iteration post-processing
-        e[n_exp] = sqrt(np.sum(np.square(err_slabs)))
-        re[n_exp] = e[n_exp] / sqrt(np.sum(np.square(norm_slabs)))
+        ee[n_exp] = sqrt(np.sum(np.square(err_slabs)))
+        rre[n_exp] = ee[n_exp] / sqrt(np.sum(np.square(norm_slabs)))
         print(
             "Total error",
-            float_f(e[n_exp]),
+            float_f(ee[n_exp]),
             "Total relative error",
-            float_f(re[n_exp]),
+            float_f(rre[n_exp]),
             "\n"
         )
         
     # ------------------------------------------------------------------------ #
     #                               POST-PROCESS                               #
     # ------------------------------------------------------------------------ #
-    # Cpompute rate
-    r = compute_rate(nn_dofs, re)[-1]
-    C = re[0] / nn_dofs[0] ** r
     
+    hh = 1 / nn_x
+    ddt = tt_slab_size / nn_t
+    xx = ddt
+
+    # Compute rate
+    # r = compute_rate(nn_dofs, re)[-1]
+    # C = re[0] / nn_dofs[0] ** r
+    r = compute_rate(xx, rre)
+    print("Convergence rate", r)
+    r =r[-1]
+    C = rre[0] / xx[0] ** r
+        
     # Print
     print("Numbed of dofs", nn_dofs)
-    print("Error", e)
-    print("Rel. err.", re)
+    print("hh", hh)
+    print("ddt", ddt)
+    print("Error", ee)
+    print("Rel. err.", rre)
     print(f"Convergence rate of rel. err.: {r:.4g}")
 
     # Plot
+    # plt.figure()
+    # plt.loglog(nn_dofs, e, marker="o", label="Error")
+    # plt.loglog(nn_dofs, re, marker="s", label="Relative Error")
+    # plt.loglog(nn_dofs, C * nn_dofs**r, "k-", label=f"x^{r:.4g}")
+    # plt.xlabel("# Degrees of Freedom")
+    # plt.ylabel("Error")
+    # plt.legend()
+    # plt.title("Error vs Degrees of Freedom (log-log scale)")
+    # plt.grid(True, which="both", ls="--")
+    # plt.show()
+
     plt.figure()
-    plt.loglog(nn_dofs, e, marker="o", label="Error")
-    plt.loglog(nn_dofs, re, marker="s", label="Relative Error")
-    plt.loglog(nn_dofs, C * nn_dofs**r, "k-", label=f"x^{r:.4g}")
-    plt.xlabel("# Degrees of Freedom")
+    plt.loglog(xx, ee, marker="o", label="Error")
+    plt.loglog(xx, rre, marker="s", label="Relative Error")
+    plt.loglog(xx, C * xx**r, "k-", label=f"x^{r:.4g}")
+    plt.xlabel("h + dt")
     plt.ylabel("Error")
     plt.legend()
-    plt.title("Error vs Degrees of Freedom (log-log scale)")
+    plt.title("Error vs mesh spacing (log-log scale)")
     plt.grid(True, which="both", ls="--")
     plt.show()

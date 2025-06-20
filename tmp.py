@@ -1,20 +1,18 @@
-from sympy import symbols, sin, pi, exp, diff
-from sympy import factor, simplify
+import matplotlib.pyplot as plt
+from dolfinx import mesh
+from mpi4py import MPI
+import numpy as np
 
-t, x, c = symbols("t x c")  # symbols
 
-# u = sin(pi * x) * (1.0 + t) * exp(-0.5 * t)
-u = sin(pi * x) * (1 + t) * exp(c * t)  # function u(t, x)
+comm = MPI.COMM_SELF
+n_x = 9
+msh = mesh.create_unit_interval(comm, n_x)
+xx = msh.geometry.x[:, 0]
+plt.plot(xx, np.zeros_like(xx), '.-', markersize=20)
 
-du_dt = diff(u, t, 1)  # ∂²u/∂t²
-d2u_dx2 = diff(u, x, 2)  # ∂²u/∂x²
-result = du_dt - d2u_dx2  # ∂²u/∂t² - ∂²u/∂x²
+msh_ref = mesh.refine(msh)[0]
+xx = msh_ref.geometry.x[:, 0]
+plt.plot(xx, np.zeros_like(xx), 'o-')
+plt.show()
 
-print("u(t,x) =", u)
-print("\nd_t u =", du_dt)
-print("\nd_x^2 u =", d2u_dx2)
-# print("\nd_t u - d_x^2 u =", result)
-print("\nd_t u - d_x^2 u (factorized) =", factor(simplify(result)))
 
-result_sub = result.subs(c, -1./2.)
-print("\nd_t^2 u - d_x^2 u with c = -1/2:", result_sub)

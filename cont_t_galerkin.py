@@ -9,6 +9,8 @@ import scipy.sparse
 from ufl import TestFunction, TrialFunction, dx, grad, inner
 
 from utils import float_f
+from scipy.interpolate import griddata
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def cart_prod_coords(t_coords, x_coords):
@@ -23,17 +25,21 @@ class SpaceFE:
     form = {}
     matrix = {}
 
-    def __init__(self, msh, V, boundary_data, boundary_D):
-        self.msh = msh
+    def __init__(self, mesh, V, boundary_data=None, boundary_D=None):
+        assert (boundary_data is None and boundary_D is None) or (
+            boundary_data is not None and boundary_D is not None
+        )
+        self.mesh = mesh
         self.V = V
         self.dofs = self.V.tabulate_dof_coordinates()
         # NB dofs are always 3d! -> Truncate
-        self.dofs = self.dofs[:, 0 : msh.geometry.dim].reshape((-1, msh.geometry.dim))
+        self.dofs = self.dofs[:, 0 : mesh.geometry.dim].reshape((-1, mesh.geometry.dim))
         self.n_dofs = self.dofs.shape[0]
         # self.print_dofs()  # debugging
         self.assemble_matrices()
 
-        self.set_boundary_conditions(boundary_data, boundary_D)
+        if boundary_data is not None:
+            self.set_boundary_conditions(boundary_data, boundary_D)
 
     def set_boundary_conditions(self, boundary_data, boundary_D):
         u_D = fem.Function(self.V)
@@ -151,8 +157,7 @@ def assemble_ctg_slab(Space, u0, Time, exact_rhs, boundary_data):
         + stiffness_matrix
     )
 
-    # Assemble right hand side vector
-    # define the RHS as: space-time mass * RHS on dofs
+    # Assemble RHS vector as space-time mass * RHS on dofs
     # TODO better to use projection? I'll use higher order FEM!
     space_time_coords = cart_prod_coords(Time.dofs, Space.dofs)
     rhs = mass_matrix.dot(exact_rhs(space_time_coords))
@@ -249,19 +254,15 @@ def run_CTG_elliptic(
 
         # Error curr slab
         if callable(exact_sol):  # compute error only if exact_sol is a function
-            space_time_coords = cart_prod_coords(Time.dofs, Space.dofs)
-            ex_sol_slab = exact_sol(space_time_coords)
-            err_slab = ex_sol_slab - sol_slab
-
-            if err_type == "h1":
-                ip_matrix = mass_matrix + stiffness_matrix
-            elif err_type == "l2":
-                ip_matrix = mass_matrix
-            else:
-                raise ValueError(f"Unknown error type: {err_type}")
-
-            err_slabs[i] = sqrt(ip_matrix.dot(err_slab).dot(err_slab))
-            norm_u_slabs[i] = sqrt(ip_matrix.dot(sol_slab).dot(sol_slab))
+            err_slabs[i], norm_u_slabs[i] = compute_error_slab(
+                Space,
+                exact_sol,
+                err_type,
+                Time,
+                sol_slab,
+                # mass_matrix,
+                # stiffness_matrix
+            )
 
             if verbose:
                 print("Current L2 error", float_f(err_slabs[i]))
@@ -269,6 +270,57 @@ def run_CTG_elliptic(
                     "Current L2 relative error", float_f(err_slabs[i] / norm_u_slabs[i])
                 )
                 print("Done.\n")
-    
+
     n_dofs = Space.n_dofs * total_n_dofs_t
     return err_slabs, norm_u_slabs, n_dofs
+
+
+def compute_error_slab(
+    Space, exact_sol, err_type, Time, sol_slab
+):  # mass_mat, stif_mat, ):
+    # --------------------------------- WRONG -------------------------------- #
+    # space_time_coords = cart_prod_coords(Time.dofs, Space.dofs)
+    # ex_sol_slab = exact_sol(space_time_coords)  
+    # # compute exact sol on dofs; i.e. PROJECT exact sol in discrete sapce
+    # --------------------------------- WRONG -------------------------------- #
+
+    # refine Time
+    msh_t = Time.mesh
+    msh_t_ref = mesh.refine(msh_t)[0]
+    p_Time = Time.V.element.basix_element.degree
+    V_t_ref = fem.functionspace(msh_t_ref, ("Lagrange", p_Time))
+    Time_ref = TimeFE(msh_t_ref, V_t_ref)
+
+    # refine Space
+    msh_x = Space.mesh
+    msh_x_ref = mesh.refine(msh_x)[0]
+    p_Space = Space.V.element.basix_element.degree
+    V_x_ref = fem.functionspace(msh_x_ref, ("Lagrange", p_Space))
+    Space_ref = SpaceFE(msh_x_ref, V_x_ref)
+
+    # Interpolate exact sol in fine space # TODO valid only for P=1!
+    fine_coords = cart_prod_coords(Time_ref.dofs, Space_ref.dofs)
+    ex_sol_ref = exact_sol(fine_coords)
+
+    # Interpolate using griddata (linear interpolation) # TODO valid only for P=1!
+    coarse_coords = cart_prod_coords(Time.dofs, Space.dofs)
+    sol_slab_ref = griddata(
+        coarse_coords, sol_slab, fine_coords, method="linear", fill_value=0.0
+    )
+
+    # Compute IP matrix
+    mass_matrix = scipy.sparse.kron(Time_ref.matrix["mass"], Space_ref.matrix["mass"])
+    if err_type == "h1":
+        stiffness_matrix = scipy.sparse.kron(
+            Time_ref.matrix["mass"], Space_ref.matrix["laplace"]
+        )
+        ip_matrix = mass_matrix + stiffness_matrix
+    elif err_type == "l2":
+        ip_matrix = mass_matrix
+    else:
+        raise ValueError(f"Unknown error type: {err_type}")
+
+    err_fun_ref = ex_sol_ref - sol_slab_ref
+    err = sqrt(ip_matrix.dot(err_fun_ref).dot(err_fun_ref))
+    norm_u = sqrt(ip_matrix.dot(sol_slab_ref).dot(sol_slab_ref))
+    return err, norm_u
