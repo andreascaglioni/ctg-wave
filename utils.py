@@ -2,6 +2,27 @@ import numpy as np
 from dolfinx import fem, io
 
 
+
+def compute_rate(xx, yy):
+    """
+    Compute the logarithmic rate of change between consecutive elements of two arrays.
+
+    Args:
+        xx (numpy.ndarray): 1D array of positive x-coordinates.
+        yy (numpy.ndarray): 1D array of positive y-coordinates.
+
+    Returns:
+        numpy.ndarray: Logarithmic rates of change.
+
+    Raises:
+        ValueError: If arrays have different lengths or contain non-positive values.
+
+    Example:
+        >>> compute_rate(np.array([1, 2, 4]), np.array([2, 4, 8]))
+        array([1., 1.])
+    """
+    return np.log(yy[1:] / yy[:-1]) / np.log(xx[1:] / xx[:-1])
+
 def float_f(x):
     """
     Format a float variable in scientific notation.

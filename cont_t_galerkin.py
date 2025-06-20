@@ -37,7 +37,7 @@ class SpaceFE:
 
     def set_boundary_conditions(self, boundary_data, boundary_D):
         u_D = fem.Function(self.V)
-        
+
         # express boundary data as a function of space only
         def boundary_data_x(xx):
             tt = np.zeros((xx.shape[1], 1))
@@ -144,10 +144,12 @@ def compute_time_slabs(start_time, end_time, slab_size):
 
 def assemble_ctg_slab(Space, u0, Time, exact_rhs, boundary_data):
     # Assemble space-time matrices (linear PDEs -> Kronecker product t & x matrices)
-    system_matrix = scipy.sparse.kron(Time.matrix["derivative"], Space.matrix["mass"])
-    system_matrix += scipy.sparse.kron(Time.matrix["mass"], Space.matrix["laplace"])
-
     mass_matrix = scipy.sparse.kron(Time.matrix["mass"], Space.matrix["mass"])
+    stiffness_matrix = scipy.sparse.kron(Time.matrix["mass"], Space.matrix["laplace"])
+    system_matrix = (
+        scipy.sparse.kron(Time.matrix["derivative"], Space.matrix["mass"])
+        + stiffness_matrix
+    )
 
     # Assemble right hand side vector
     # define the RHS as: space-time mass * RHS on dofs
@@ -184,7 +186,7 @@ def assemble_ctg_slab(Space, u0, Time, exact_rhs, boundary_data):
     rhs = rhs * (1.0 - dofs_boundary)
     rhs += bc_curr_slab * dofs_boundary
 
-    return system_matrix, mass_matrix, rhs, bc_curr_slab
+    return system_matrix, mass_matrix, stiffness_matrix, rhs, bc_curr_slab
 
 
 def run_CTG_elliptic(
@@ -197,36 +199,36 @@ def run_CTG_elliptic(
     exact_rhs,
     initial_data,
     exact_sol=None,
+    err_type="h1",
+    verbose=False,
 ):
     # coordinates initial condition wrt space-time basis
     init_time = time_slabs[0][0]
-    u0 = initial_data(
-        cart_prod_coords(np.array([[init_time]]), Space.dofs)
-    )  
+    u0 = initial_data(cart_prod_coords(np.array([[init_time]]), Space.dofs))
 
-    total_temporal_dofs = 0
+    total_n_dofs_t = 0
     sol_slabs = []
-    L2_errs = np.zeros((len(time_slabs),))  # square L2 error current slab
-    L2_norms = np.zeros_like(L2_errs)  # square L2 norm apx. sol.
+    err_slabs = np.zeros((len(time_slabs),))  # square L2 error current slab
+    norm_u_slabs = np.zeros_like(err_slabs)  # square L2 norm apx. sol.
 
     # Time marching over slabs
     for i, slab in enumerate(time_slabs):
-        print(
-            f"Solving on slab_{i} = D x ({round(slab[0], 5)}, {round(slab[1], 5)}) ...",
-            flush=True,
-        )
+        if verbose:
+            print(
+                f"Solving on slab_{i} = D x ({round(slab[0], 5)}, {round(slab[1], 5)}) ...",
+                flush=True,
+            )
 
         # Compute FE object for current slab TIME discretization
         msh_t = mesh.create_interval(comm, n_time, [slab[0], slab[1]])
-
         V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
         Time = TimeFE(msh_t, V_t)
+        total_n_dofs_t += Time.n_dofs
 
         # Assemble linear system
-        system_matrix, mass_matrix, rhs, slab_exact_sol = assemble_ctg_slab(
-            Space, u0, Time, exact_rhs, boundary_data
+        system_matrix, mass_matrix, stiffness_matrix, rhs, ex_sol_slab = (
+            assemble_ctg_slab(Space, u0, Time, exact_rhs, boundary_data)
         )
-        total_temporal_dofs += Time.n_dofs
 
         # Solve linear system (sparse direct solver)
         sol_slab = scipy.sparse.linalg.spsolve(system_matrix, rhs)
@@ -234,23 +236,39 @@ def run_CTG_elliptic(
         # Check residual
         residual_slab = system_matrix.dot(sol_slab) - rhs
         rel_res_slab = np.linalg.norm(residual_slab) / np.linalg.norm(sol_slab)
-        print(f"Relative residual solver slab {i}:", float_f(rel_res_slab))
+        warn = False
+        if rel_res_slab > 1.0e-4:
+            warn = True
+            print("WARNING: ", end="")
+        if verbose or warn:
+            print(f"Relative residual solver slab {i}:", float_f(rel_res_slab))
 
-        # get initial condition on next slab = final condition from this slab
+        # Get initial condition on next slab = final condition from this slab
         last_time_dof = Time.dofs.argmax()
         u0 = sol_slab[last_time_dof * Space.n_dofs : (last_time_dof + 1) * Space.n_dofs]
-
-        sol_slabs.append(sol_slab)
 
         # Error curr slab
         if callable(exact_sol):  # compute error only if exact_sol is a function
             space_time_coords = cart_prod_coords(Time.dofs, Space.dofs)
-            slab_exact_sol = exact_sol(space_time_coords)
-            slab_error = slab_exact_sol - sol_slab
-            L2_errs[i] = sqrt(mass_matrix.dot(slab_error).dot(slab_error))
-            L2_norms[i] = sqrt(mass_matrix.dot(sol_slab).dot(sol_slab))
-            print("Current L2 error", float_f(L2_errs[i]))
-            print("Current L2 relative error", float_f(L2_errs[i] / L2_norms[i]))
+            ex_sol_slab = exact_sol(space_time_coords)
+            err_slab = ex_sol_slab - sol_slab
 
-        print("Done.\n")
-    return L2_errs, L2_norms
+            if err_type == "h1":
+                ip_matrix = mass_matrix + stiffness_matrix
+            elif err_type == "l2":
+                ip_matrix = mass_matrix
+            else:
+                raise ValueError(f"Unknown error type: {err_type}")
+
+            err_slabs[i] = sqrt(ip_matrix.dot(err_slab).dot(err_slab))
+            norm_u_slabs[i] = sqrt(ip_matrix.dot(sol_slab).dot(sol_slab))
+
+            if verbose:
+                print("Current L2 error", float_f(err_slabs[i]))
+                print(
+                    "Current L2 relative error", float_f(err_slabs[i] / norm_u_slabs[i])
+                )
+                print("Done.\n")
+    
+    n_dofs = Space.n_dofs * total_n_dofs_t
+    return err_slabs, norm_u_slabs, n_dofs
