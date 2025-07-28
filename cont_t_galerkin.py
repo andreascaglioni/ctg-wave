@@ -99,30 +99,12 @@ class TimeFE:
             print(dof, ":", dof_t)
 
     def assemble_matrices(self):
-        # initial_time = CompiledSubDomain("near(x[0], t0)", t0=self.dofs[0, 0])
-        # interior_facets = CompiledSubDomain("!on_boundary")
-        # boundary_marker = MeshFunction("size_t", self.mesh, 0)
-        # boundary_marker.set_all(0)
-        # initial_time.mark(boundary_marker, 1)
-        # interior_facets.mark(boundary_marker, 2)
-
-        # Measure for the initial time
-        # d0 = Measure(
-        #     "ds", domain=self.mesh, subdomain_data=boundary_marker, subdomain_id=1
-        # )
-        # dS = Measure(
-        #     "dS", domain=self.mesh, subdomain_data=boundary_marker, subdomain_id=2
-        # )
 
         u = TrialFunction(self.V)
         phi = TestFunction(self.V)
 
-        # NOTE: FEniCS has weird definitions for '+' and '-' (https://fenicsproject.discourse.group/t/integrating-over-an-interior-surface/247/3)
-
         self.form["derivative"] = fem.form(grad(u)[0] * phi * dx)
-        # NB I do CTG therefore dont need fcollowing 2 lines
-        # + (u("-") - u("+")) * phi("-") * dS  # jump interior facets
-        # + u("+") * phi("+") * d0  # jump initial time
+        
         self.form["mass"] = fem.form(u * phi * dx)
 
         for name, _form in self.form.items():
@@ -133,12 +115,6 @@ class TimeFE:
                 dl_mat_curr2,
                 shape=(self.n_dofs, self.n_dofs),
             )
-
-
-# self.matrix[name] = scipy.sparse.csr_matrix(
-#     (fem.petsc.assemble(_form)).mat().getValuesCSR()[::-1],
-#     shape=(self.n_dofs, self.n_dofs),
-# )
 
 
 def compute_time_slabs(start_time, end_time, slab_size):
