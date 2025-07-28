@@ -10,11 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
-from cont_t_galerkin import (
-    SpaceFE,
-    compute_time_slabs,
-    run_CTG_parabolic,
-)
+from cont_t_galerkin.utils import compute_time_slabs, run_CTG_parabolic
+from cont_t_galerkin.FE_spaces import SpaceFE
 
 sys.path.append("../stochllg")
 from utils import float_f
@@ -28,13 +25,13 @@ if __name__ == "__main__":
     msh_x = mesh.create_unit_interval(comm, n_space)
     order_x = 1
     V_x = fem.functionspace(msh_x, ("Lagrange", 1))
-    
-    t_slab_size =  1.
+
+    t_slab_size = 1.0
     order_t = 1  # polynomial degree in time
     n_time = 3  # number of temporal elements per time slab
 
     # Physics
-    start_time = 0.
+    start_time = 0.0
     end_time = t_slab_size  # for now don't change
     boundary_D = lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))  # noqa: E731
     from data.exact_solution_heat import (
@@ -43,8 +40,6 @@ if __name__ == "__main__":
         initial_data,
         exact_sol,
     )
-
-
 
     # COMPUTE
     time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
@@ -63,20 +58,24 @@ if __name__ == "__main__":
     )
 
     # Plot
-    from cont_t_galerkin import cart_prod_coords
+    from cont_t_galerkin.utils import cart_prod_coords
+
     sol = sol_slabs[0]
     xx = msh_x.geometry.x[:, 0]  # shape (# nodes, 3)
     dt = t_slab_size / n_time
     for i_t in range(n_time):
-        t = i_t* dt
-        u_t_dofs = sol[i_t*(n_space+1):(i_t+1)*(n_space+1)]
-        plt.plot(xx, u_t_dofs, 'o')
+        t = i_t * dt
+        u_t_dofs = sol[i_t * (n_space + 1) : (i_t + 1) * (n_space + 1)]
+        plt.plot(xx, u_t_dofs, "o")
 
         X = cart_prod_coords(np.array([t]), xx)
         u_ex = exact_sol(X)
-        plt.plot(xx, u_ex, '.-',)
+        plt.plot(
+            xx,
+            u_ex,
+            ".-",
+        )
         plt.show()
-
 
     # POST-PROCESS
     total_err = sqrt(np.sum(np.square(errs_slabs)))
@@ -87,6 +86,3 @@ if __name__ == "__main__":
         "Total relative error",
         float_f(total_rel_err),
     )
-    
-
-    

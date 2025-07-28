@@ -10,11 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
-from cont_t_galerkin import (
-    SpaceFE,
-    compute_time_slabs,
-    run_CTG_parabolic,
-)
+from cont_t_galerkin.utils import compute_time_slabs, run_CTG_parabolic
+from cont_t_galerkin.FE_spaces import SpaceFE
 
 sys.path.append("../stochllg")
 from utils import float_f, compute_rate
@@ -25,20 +22,18 @@ if __name__ == "__main__":
     np.set_printoptions(formatter={"float_kind": float_f})
     comm = MPI.COMM_SELF
 
-
-
     # DATA
     # Physical
     start_time = 0.0
-    end_time = 1.
+    end_time = 1.0
     boundary_D = lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))  # noqa: E731
     from data.exact_solution_heat_2 import (
         exact_rhs,
         boundary_data,
         initial_data,
         exact_sol,
-    )   
-    
+    )
+
     # Numerics data
     n_refs = 7  # number of refinement
 
@@ -54,7 +49,7 @@ if __name__ == "__main__":
     pp_x = np.ones(n_refs, dtype=int)
     tt_slab_size = end_time * np.ones(n_refs)
     pp_t = np.ones(n_refs, dtype=int)
-    nn_t = 2**np.arange(n_refs, dtype=int)  # refine mesh time
+    nn_t = 2 ** np.arange(n_refs, dtype=int)  # refine mesh time
 
     # ------------------------------------------------------------------------ #
     #                             CONVERGENCE TEST                             #
@@ -109,13 +104,13 @@ if __name__ == "__main__":
             float_f(ee[n_exp]),
             "Total relative error",
             float_f(rre[n_exp]),
-            "\n"
+            "\n",
         )
-        
+
     # ------------------------------------------------------------------------ #
     #                               POST-PROCESS                               #
     # ------------------------------------------------------------------------ #
-    
+
     hh = 1 / nn_x
     ddt = tt_slab_size / nn_t
     xx = ddt
@@ -125,7 +120,7 @@ if __name__ == "__main__":
         rr = compute_rate(xx, rre)
         r = rr[-1]
         C = rre[0] / (xx[0] ** r)
-        
+
     # Print
     print("Numbed of dofs", nn_dofs)
     print("hh", hh)
@@ -137,7 +132,7 @@ if __name__ == "__main__":
     # X refinement plot
     plt.figure()
     plt.loglog(xx, rre, marker="s", label="Relative Error")
-    if xx.size>1:
+    if xx.size > 1:
         plt.loglog(xx, C * xx**r, "k-", label=f"x^{r:.4g}")
     plt.xlabel("h")
     plt.legend()
