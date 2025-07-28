@@ -13,7 +13,7 @@ from dolfinx import fem, mesh
 from cont_t_galerkin import (
     SpaceFE,
     compute_time_slabs,
-    run_CTG_elliptic,
+    run_CTG_parabolic,
 )
 
 sys.path.append("../stochllg")
@@ -21,10 +21,14 @@ from utils import float_f, compute_rate
 
 
 if __name__ == "__main__":
-    # ------------------------------------------------------------------------ #
-    #                                   DATA                                   #
-    # ------------------------------------------------------------------------ #
-    # Physical data
+    # SETTINGS
+    np.set_printoptions(formatter={"float_kind": float_f})
+    comm = MPI.COMM_SELF
+
+
+
+    # DATA
+    # Physical
     start_time = 0.0
     end_time = 1.
     boundary_D = lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))  # noqa: E731
@@ -36,22 +40,21 @@ if __name__ == "__main__":
     )   
     
     # Numerics data
-    comm = MPI.COMM_SELF
-    n_refs = 6  # number of refinement
+    n_refs = 7  # number of refinement
 
     # ---------------------- Ex 1: Space mesh refinement --------------------- #
-    # nn_x = 10 * 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
+    # nn_x = 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
     # pp_x = np.ones(n_refs, dtype=int)  # polynomial degree in space
     # tt_slab_size = end_time * np.ones(n_refs)
     # pp_t = np.ones(n_refs, dtype=int)
-    # nn_t = 100 * np.ones(n_refs, dtype=int)  # number of t elements per time-slab
+    # nn_t = 300 * np.ones(n_refs, dtype=int)  # number of t elements per time-slab
 
     # ---------------------- Ex. 2: Time mesh refinement --------------------- #
-    nn_x = 3200 * np.ones(n_refs, dtype=int)
+    nn_x = 400 * np.ones(n_refs, dtype=int)
     pp_x = np.ones(n_refs, dtype=int)
     tt_slab_size = end_time * np.ones(n_refs)
     pp_t = np.ones(n_refs, dtype=int)
-    nn_t = 10 * 2**np.arange(n_refs, dtype=int)  # refine mesh time
+    nn_t = 2**np.arange(n_refs, dtype=int)  # refine mesh time
 
     # ------------------------------------------------------------------------ #
     #                             CONVERGENCE TEST                             #
@@ -83,7 +86,7 @@ if __name__ == "__main__":
         Space = SpaceFE(msh_x, V_x, boundary_data, boundary_D)
 
         # Time marching
-        err_slabs, norm_slabs, nn_dofs[n_exp] = run_CTG_elliptic(
+        _, err_slabs, norm_slabs, nn_dofs[n_exp] = run_CTG_parabolic(
             comm,
             Space,
             n_t,
@@ -93,7 +96,7 @@ if __name__ == "__main__":
             exact_rhs,
             initial_data,
             exact_sol,
-            err_type="l2",
+            err_type="h1",
             verbose=False,
         )
 
@@ -117,12 +120,11 @@ if __name__ == "__main__":
     xx = ddt
 
     # Compute rate
-    # r = compute_rate(nn_dofs, re)[-1]
-    # C = re[0] / nn_dofs[0] ** r
-    r = compute_rate(xx, rre)
-    print("Convergence rate", r)
-    r =r[-1]
-    C = rre[0] / xx[0] ** r
+    if xx.size > 1:
+        rr = compute_rate(xx, rre)
+        print("Convergence rate", rr)
+        r = rr[-1]
+        C = rre[0] / (xx[0] ** r)
         
     # Print
     print("Numbed of dofs", nn_dofs)
@@ -130,27 +132,26 @@ if __name__ == "__main__":
     print("ddt", ddt)
     print("Error", ee)
     print("Rel. err.", rre)
-    print(f"Convergence rate of rel. err.: {r:.4g}")
+    print(f"Convergence rate rel. err.: {r:.4g}")
 
-    # Plot
-    # plt.figure()
-    # plt.loglog(nn_dofs, e, marker="o", label="Error")
-    # plt.loglog(nn_dofs, re, marker="s", label="Relative Error")
-    # plt.loglog(nn_dofs, C * nn_dofs**r, "k-", label=f"x^{r:.4g}")
-    # plt.xlabel("# Degrees of Freedom")
-    # plt.ylabel("Error")
-    # plt.legend()
-    # plt.title("Error vs Degrees of Freedom (log-log scale)")
-    # plt.grid(True, which="both", ls="--")
-    # plt.show()
-
+    # X refinement plot
     plt.figure()
-    plt.loglog(xx, ee, marker="o", label="Error")
     plt.loglog(xx, rre, marker="s", label="Relative Error")
-    plt.loglog(xx, C * xx**r, "k-", label=f"x^{r:.4g}")
-    plt.xlabel("h + dt")
-    plt.ylabel("Error")
+    if xx.size>1:
+        plt.loglog(xx, C * xx**r, "k-", label=f"x^{r:.4g}")
+    plt.xlabel("h")
     plt.legend()
     plt.title("Error vs mesh spacing (log-log scale)")
     plt.grid(True, which="both", ls="--")
     plt.show()
+
+    # T refinement plot
+    # plt.figure()
+    # plt.loglog(xx, rre, marker="s", label="Relative Error")
+    # if xx.size>1:
+    #     plt.loglog(xx, C * xx**r, "k-", label=f"x^{r:.4g}")
+    # plt.xlabel("dt")
+    # plt.legend()
+    # plt.title("Error vs # t-dofs (log-log scale)")
+    # plt.grid(True, which="both", ls="--")
+    # plt.show()

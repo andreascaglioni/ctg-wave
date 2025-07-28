@@ -194,9 +194,9 @@ def assemble_ctg_slab(Space, u0, Time, exact_rhs, boundary_data):
     return system_matrix, mass_matrix, stiffness_matrix, rhs, bc_curr_slab
 
 
-def run_CTG_elliptic(
+def run_CTG_parabolic(
     comm,
-    Space,
+    space_fe,
     n_time,
     order_t,
     time_slabs,
@@ -207,9 +207,10 @@ def run_CTG_elliptic(
     err_type="h1",
     verbose=False,
 ):
+
     # coordinates initial condition wrt space-time basis
     init_time = time_slabs[0][0]
-    u0 = initial_data(cart_prod_coords(np.array([[init_time]]), Space.dofs))
+    u0 = initial_data(cart_prod_coords(np.array([[init_time]]), space_fe.dofs))
 
     total_n_dofs_t = 0
     sol_slabs = []
@@ -232,15 +233,16 @@ def run_CTG_elliptic(
 
         # Assemble linear system
         system_matrix, mass_matrix, stiffness_matrix, rhs, ex_sol_slab = (
-            assemble_ctg_slab(Space, u0, Time, exact_rhs, boundary_data)
+            assemble_ctg_slab(space_fe, u0, Time, exact_rhs, boundary_data)
         )
 
         # Solve linear system (sparse direct solver)
-        sol_slab = scipy.sparse.linalg.spsolve(system_matrix, rhs)
+        sol_slab_dofs = scipy.sparse.linalg.spsolve(system_matrix, rhs)
+        sol_slabs.append(sol_slab_dofs)
 
         # Check residual
-        residual_slab = system_matrix.dot(sol_slab) - rhs
-        rel_res_slab = np.linalg.norm(residual_slab) / np.linalg.norm(sol_slab)
+        residual_slab = system_matrix.dot(sol_slab_dofs) - rhs
+        rel_res_slab = np.linalg.norm(residual_slab) / np.linalg.norm(sol_slab_dofs)
         warn = False
         if rel_res_slab > 1.0e-4:
             warn = True
@@ -250,29 +252,29 @@ def run_CTG_elliptic(
 
         # Get initial condition on next slab = final condition from this slab
         last_time_dof = Time.dofs.argmax()
-        u0 = sol_slab[last_time_dof * Space.n_dofs : (last_time_dof + 1) * Space.n_dofs]
+        u0 = sol_slab_dofs[last_time_dof * space_fe.n_dofs : (last_time_dof + 1) * space_fe.n_dofs]
 
         # Error curr slab
         if callable(exact_sol):  # compute error only if exact_sol is a function
             err_slabs[i], norm_u_slabs[i] = compute_error_slab(
-                Space,
+                space_fe,
                 exact_sol,
                 err_type,
                 Time,
-                sol_slab,
+                sol_slab_dofs,
                 # mass_matrix,
                 # stiffness_matrix
             )
 
             if verbose:
-                print("Current L2 error", float_f(err_slabs[i]))
+                print("Current " + err_type + " error:", float_f(err_slabs[i]))
                 print(
-                    "Current L2 relative error", float_f(err_slabs[i] / norm_u_slabs[i])
+                    "Current " + err_type + " relative error:", float_f(err_slabs[i] / norm_u_slabs[i])
                 )
                 print("Done.\n")
 
-    n_dofs = Space.n_dofs * total_n_dofs_t
-    return err_slabs, norm_u_slabs, n_dofs
+    n_dofs = space_fe.n_dofs * total_n_dofs_t
+    return sol_slabs, err_slabs, norm_u_slabs, n_dofs
 
 
 def compute_error_slab(
