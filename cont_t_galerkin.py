@@ -204,7 +204,8 @@ def run_CTG_parabolic(
     exact_rhs,
     initial_data,
     exact_sol=None,
-    err_type="h1",
+    err_type_x="h1",
+    err_type_t="l2",
     verbose=False,
 ):
 
@@ -259,7 +260,8 @@ def run_CTG_parabolic(
             err_slabs[i], norm_u_slabs[i] = compute_error_slab(
                 space_fe,
                 exact_sol,
-                err_type,
+                err_type_x,
+                err_type_t,
                 Time,
                 sol_slab_dofs,
                 # mass_matrix,
@@ -267,9 +269,9 @@ def run_CTG_parabolic(
             )
 
             if verbose:
-                print("Current " + err_type + " error:", float_f(err_slabs[i]))
+                print("Current " + err_type_x + " error:", float_f(err_slabs[i]))
                 print(
-                    "Current " + err_type + " relative error:", float_f(err_slabs[i] / norm_u_slabs[i])
+                    "Current " + err_type_x + " relative error:", float_f(err_slabs[i] / norm_u_slabs[i])
                 )
                 print("Done.\n")
 
@@ -278,7 +280,7 @@ def run_CTG_parabolic(
 
 
 def compute_error_slab(
-    Space, exact_sol, err_type, Time, sol_slab
+    Space, exact_sol, err_type_x, err_type_t, Time, sol_slab
 ):  # mass_mat, stif_mat, ):
     # --------------------------------- WRONG -------------------------------- #
     # space_time_coords = cart_prod_coords(Time.dofs, Space.dofs)
@@ -300,29 +302,45 @@ def compute_error_slab(
     V_x_ref = fem.functionspace(msh_x_ref, ("Lagrange", p_Space))
     Space_ref = SpaceFE(msh_x_ref, V_x_ref)
 
-    # Interpolate exact sol in fine space # TODO valid only for P=1!
+    # Interpolate exact sol in fine space # TODO works only for P=1!
     fine_coords = cart_prod_coords(Time_ref.dofs, Space_ref.dofs)
     ex_sol_ref = exact_sol(fine_coords)
 
-    # Interpolate using griddata (linear interpolation) # TODO valid only for P=1!
+    # Interpolate numerical sol using griddata (linear interpolation) 
+    # TODO works only for P=1!
     coarse_coords = cart_prod_coords(Time.dofs, Space.dofs)
     sol_slab_ref = griddata(
         coarse_coords, sol_slab, fine_coords, method="linear", fill_value=0.0
     )
 
-    # Compute IP matrix
-    mass_matrix = scipy.sparse.kron(Time_ref.matrix["mass"], Space_ref.matrix["mass"])
-    if err_type == "h1":
-        stiffness_matrix = scipy.sparse.kron(
-            Time_ref.matrix["mass"], Space_ref.matrix["laplace"]
-        )
-        ip_matrix = mass_matrix + stiffness_matrix
-    elif err_type == "l2":
-        ip_matrix = mass_matrix
+    # Adapt to error type
+    if err_type_x == "h1":
+        ip_space_ref =  Space_ref.matrix["mass"] + Space_ref.matrix["laplace"]
+    elif err_type_x == "l2":
+        ip_space_ref =  Space_ref.matrix["mass"]
     else:
-        raise ValueError(f"Unknown error type: {err_type}")
+        raise ValueError(f"Unknown error type x: {err_type_x}")
+    
+    if err_type_t == "l2":
+        ip_tx = scipy.sparse.kron(Time_ref.matrix["mass"], ip_space_ref)
+    elif err_type_t == "linf":  # take max
+        pass
+    else:
+        raise ValueError(f"Unknown error type t: {err_type_t}")
 
     err_fun_ref = ex_sol_ref - sol_slab_ref
-    err = sqrt(ip_matrix.dot(err_fun_ref).dot(err_fun_ref))
-    norm_u = sqrt(ip_matrix.dot(sol_slab_ref).dot(sol_slab_ref))
+
+    if err_type_t == "l2":
+        err = sqrt(ip_tx.dot(err_fun_ref).dot(err_fun_ref))
+        norm_u = sqrt(ip_tx.dot(sol_slab_ref).dot(sol_slab_ref))
+    elif err_type_t == "linf":
+        err = -1.
+        norm_u = -1.
+        for i, t in enumerate(Time.dofs):
+            dofs_c = sol_slab_ref[i*Space_ref.n_dofs:(i+1)*Space_ref.n_dofs]
+            norm_c = sqrt(ip_space_ref.dot(dofs_c).dot(dofs_c))
+            norm_u = max(norm_u, norm_c)
+            err_dofs_c = err_fun_ref[i*Space_ref.n_dofs:(i+1)*Space_ref.n_dofs]
+            err_c = sqrt(ip_space_ref.dot(err_dofs_c).dot(err_dofs_c))
+            err = max(err, err_c)
     return err, norm_u

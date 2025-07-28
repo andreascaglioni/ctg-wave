@@ -96,7 +96,8 @@ if __name__ == "__main__":
             exact_rhs,
             initial_data,
             exact_sol,
-            err_type="h1",
+            err_type_x="h1",
+            err_type_t="linf",
             verbose=False,
         )
 
@@ -122,7 +123,6 @@ if __name__ == "__main__":
     # Compute rate
     if xx.size > 1:
         rr = compute_rate(xx, rre)
-        print("Convergence rate", rr)
         r = rr[-1]
         C = rre[0] / (xx[0] ** r)
         
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     print("ddt", ddt)
     print("Error", ee)
     print("Rel. err.", rre)
-    print(f"Convergence rate rel. err.: {r:.4g}")
+    print("Convergence rate rel. err.:", rr)
 
     # X refinement plot
     plt.figure()
