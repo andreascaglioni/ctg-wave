@@ -1,16 +1,20 @@
-"""CTG approximation wave equation."""
+"""CTG approximation heat equation. Some material is taken from
 
-import sys
+https://github.com/mathmerizing/SpaceTimeFEM_2023-2024/blob/main/Exercise3/Exercise_3_Linear_PDE.ipynb
+
+"""
+
 from math import sqrt
 import numpy as np
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
-from cont_t_galerkin.utils import compute_time_slabs, run_CTG_parabolic
-from cont_t_galerkin.FE_spaces import SpaceFE
+import sys
 
-sys.path.append("../stochllg")
-from utils import float_f
+sys.path.append("./")
+from CTG.utils import compute_time_slabs, cart_prod_coords, float_f
+from CTG.ctg_parabolic import run_CTG_parabolic
+from CTG.FE_spaces import SpaceFE
 
 
 if __name__ == "__main__":
@@ -54,7 +58,7 @@ if __name__ == "__main__":
     )
 
     # Plot
-    from cont_t_galerkin.utils import cart_prod_coords
+    
 
     sol = sol_slabs[0]
     xx = msh_x.geometry.x[:, 0]  # shape (# nodes, 3)

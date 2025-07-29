@@ -8,11 +8,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
-from cont_t_galerkin.utils import compute_time_slabs, run_CTG_parabolic
-from cont_t_galerkin.FE_spaces import SpaceFE
 
-sys.path.append("../stochllg")
-from utils import float_f, compute_rate
+sys.path.append("./")
+from CTG.utils import compute_time_slabs, float_f, compute_rate
+from CTG.ctg_parabolic import run_CTG_parabolic
+from CTG.FE_spaces import SpaceFE
+
 
 
 if __name__ == "__main__":
@@ -36,18 +37,18 @@ if __name__ == "__main__":
     n_refs = 7  # number of refinement
 
     # ---------------------- Ex 1: Space mesh refinement --------------------- #
-    # nn_x = 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
-    # pp_x = np.ones(n_refs, dtype=int)  # polynomial degree in space
-    # tt_slab_size = end_time * np.ones(n_refs)
-    # pp_t = np.ones(n_refs, dtype=int)
-    # nn_t = 300 * np.ones(n_refs, dtype=int)  # number of t elements per time-slab
-
-    # ---------------------- Ex. 2: Time mesh refinement --------------------- #
-    nn_x = 400 * np.ones(n_refs, dtype=int)
-    pp_x = np.ones(n_refs, dtype=int)
+    nn_x = 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
+    pp_x = np.ones(n_refs, dtype=int)  # polynomial degree in space
     tt_slab_size = end_time * np.ones(n_refs)
     pp_t = np.ones(n_refs, dtype=int)
-    nn_t = 2 ** np.arange(n_refs, dtype=int)  # refine mesh time
+    nn_t = 300 * np.ones(n_refs, dtype=int)  # number of t elements per time-slab
+
+    # ---------------------- Ex. 2: Time mesh refinement --------------------- #
+    # nn_x = 400 * np.ones(n_refs, dtype=int)
+    # pp_x = np.ones(n_refs, dtype=int)
+    # tt_slab_size = end_time * np.ones(n_refs)
+    # pp_t = np.ones(n_refs, dtype=int)
+    # nn_t = 2 ** np.arange(n_refs, dtype=int)  # refine mesh time
 
     # ------------------------------------------------------------------------ #
     #                             CONVERGENCE TEST                             #
@@ -111,7 +112,7 @@ if __name__ == "__main__":
 
     hh = 1 / nn_x
     ddt = tt_slab_size / nn_t
-    xx = ddt
+    xx = hh
 
     # Compute rate
     if xx.size > 1:

@@ -1,8 +1,6 @@
 """Exact data for a heat equation solution:
 \partial_t u - \Delta u = f
-differs from exact_solution_heat by the fact that this solution is INCREASING in t
-
-This example is designed 
+differs from exact_solution_heat by the fact that this solution is exponentially INCREASING in t.
 """
 
 import numpy as np

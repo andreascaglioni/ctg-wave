@@ -1,8 +1,4 @@
-"""CTG approximation heat equation. Some material is taken from
-
-https://github.com/mathmerizing/SpaceTimeFEM_2023-2024/blob/main/Exercise3/Exercise_3_Linear_PDE.ipynb
-
-"""
+"""CTG approximation wave equation."""
 
 import sys
 from math import sqrt
@@ -10,17 +6,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
-from cont_t_galerkin.utils import compute_time_slabs, run_CTG_parabolic
-from cont_t_galerkin.FE_spaces import SpaceFE
 
-sys.path.append("../stochllg")
-from utils import float_f
+from CTG.utils import compute_time_slabs, float_f
+from CTG.ctg_parabolic import run_CTG_parabolic
+from CTG.FE_spaces import SpaceFE
+from CTG.utils import 
 
 
 if __name__ == "__main__":
+    # SETTINGS
+    comm = MPI.COMM_SELF
+    np.set_printoptions(formatter={'float_kind':float_f})
+
+    
     # DATA
     # Numerics
-    comm = MPI.COMM_SELF
     n_space = 9
     msh_x = mesh.create_unit_interval(comm, n_space)
     order_x = 1
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     start_time = 0.0
     end_time = t_slab_size  # for now don't change
     boundary_D = lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))  # noqa: E731
-    from data.exact_solution_heat import (
+    from data.exact_solution_wave import (
         exact_rhs,
         boundary_data,
         initial_data,
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
     space_fe = SpaceFE(msh_x, V_x, boundary_data, boundary_D)
 
-    sol_slabs, errs_slabs, norms_slabs, n_dofs = run_CTG_parabolic(
+    sol_slabs, errs_slabs, norms_slabs, n_dofs = run_CTG_hyperbolic(
         comm,
         space_fe,
         n_time,
