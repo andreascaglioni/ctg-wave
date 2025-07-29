@@ -17,14 +17,13 @@ def exact_sol(X):
         X (np.ndarray): Array of shape (n, 2), where each row is a space-time point (t, x).
 
     Returns:
-        np.ndarray: Array of shape (n, 2). For each row, the first column is u (unknown),
-        and the second column is v (∂_t u) at the corresponding space-time point.
+        np.ndarray: Array of shape (2, n). The first ROW is u (unknown), the second is v.
     """
     _t = X[:, 0]
     _x = X[:, 1]
     u = np.sin(np.pi * _x) * (1.0 + _t) * np.exp(-_t)
     v = np.sin(np.pi * _x) * (-_t) * np.exp(-_t)
-    return np.column_stack((u, v))
+    return np.vstack((u, v))
 
 
 def exact_rhs(X):
@@ -32,13 +31,14 @@ def exact_rhs(X):
     _x = X[:, 1]
     f1 = np.sin(np.pi * _x) * np.exp(-_t) * (1 + _t) * (-_t - 1 + np.pi**2)
     f0 = np.zeros_like(f1)
-    return np.column_stack((f0, f1))
+    return np.vstack((f0, f1))
 
 
 def boundary_data(X):
     _t = X[:, 1]
     _x = X[:, 0]
-    return 0 * _x
+    z = 0 * _x
+    return np.vstack((z, z))
 
 
 def initial_data(X):
@@ -46,4 +46,4 @@ def initial_data(X):
     _x = X[:, 1]
     u0 = np.sin(np.pi * _x) + 0.0 * _t
     v0 = 0.0 * _t
-    return np.column_stack((u0, v0))
+    return np.vstack((u0, v0))
