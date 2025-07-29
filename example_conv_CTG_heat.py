@@ -1,6 +1,4 @@
-"""CTG approximation wave equation. Some material is taken from
-
-https://github.com/mathmerizing/SpaceTimeFEM_2023-2024/blob/main/Exercise3/Exercise_3_Linear_PDE.ipynb
+"""CTG approximation heat equation. Convergence test in t or x
 
 """
 

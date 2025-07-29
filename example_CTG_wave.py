@@ -1,8 +1,4 @@
-"""CTG approximation heat equation. Some material is taken from
-
-https://github.com/mathmerizing/SpaceTimeFEM_2023-2024/blob/main/Exercise3/Exercise_3_Linear_PDE.ipynb
-
-"""
+"""CTG approximation wave equation."""
 
 import sys
 from math import sqrt
