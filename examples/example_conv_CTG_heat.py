@@ -35,43 +35,40 @@ if __name__ == "__main__":
 
     # Numerics data
     n_refs = 7  # number of refinement
+    refinement = "x"
 
-    # ---------------------- Ex 1: Space mesh refinement --------------------- #
-    nn_x = 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
-    pp_x = np.ones(n_refs, dtype=int)  # polynomial degree in space
-    tt_slab_size = end_time * np.ones(n_refs)
-    pp_t = np.ones(n_refs, dtype=int)
-    nn_t = 300 * np.ones(n_refs, dtype=int)  # number of t elements per time-slab
+    if refinement == "x":
+        nn_x = 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
+        pp_x = np.ones(n_refs, dtype=int)  # polynomial degree in space
+        tt_slab_size = end_time * np.ones(n_refs)
+        pp_t = np.ones(n_refs, dtype=int)
+        nn_t = 300 * np.ones(n_refs, dtype=int)  # number of t elements per time-slab
+    else:
+        nn_x = 400 * np.ones(n_refs, dtype=int)
+        pp_x = np.ones(n_refs, dtype=int)
+        tt_slab_size = end_time * np.ones(n_refs)
+        pp_t = np.ones(n_refs, dtype=int)
+        nn_t = 2 ** np.arange(n_refs, dtype=int)  # refine mesh time
 
-    # ---------------------- Ex. 2: Time mesh refinement --------------------- #
-    # nn_x = 400 * np.ones(n_refs, dtype=int)
-    # pp_x = np.ones(n_refs, dtype=int)
-    # tt_slab_size = end_time * np.ones(n_refs)
-    # pp_t = np.ones(n_refs, dtype=int)
-    # nn_t = 2 ** np.arange(n_refs, dtype=int)  # refine mesh time
 
-    # ------------------------------------------------------------------------ #
-    #                             CONVERGENCE TEST                             #
-    # ------------------------------------------------------------------------ #
+
+    # CONVERGENCE TEST
     ee = np.zeros((n_refs))
     rre = np.zeros_like(ee)
     nn_dofs = np.zeros(n_refs, dtype=int)
-
     for n_exp in range(n_refs):
         print("Refinement", n_exp, flush=True)
         n_x = nn_x[n_exp]
         p_x = pp_x[n_exp]
-
         t_slab_size = tt_slab_size[n_exp]
         p_t = pp_t[n_exp]
         n_t = nn_t[n_exp]
-
         print("n_x:", n_x, "p_x:", p_x)
         print("t_slab_size:", t_slab_size, "p_t:", p_t, "n_t:", n_t)
 
-        # -------------------------------------------------------------------- #
-        #                                  COMPUTE                             #
-        # -------------------------------------------------------------------- #
+        
+        
+        # COMPUTE
         msh_x = mesh.create_unit_interval(comm, n_x)
         V_x = fem.functionspace(msh_x, ("Lagrange", p_x))
         time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
@@ -106,13 +103,15 @@ if __name__ == "__main__":
             "\n",
         )
 
-    # ------------------------------------------------------------------------ #
-    #                               POST-PROCESS                               #
-    # ------------------------------------------------------------------------ #
 
+
+    # POST-PROCESS
     hh = 1 / nn_x
     ddt = tt_slab_size / nn_t
-    xx = hh
+    if refinement == "x":
+        xx = hh
+    else:
+        xx = ddt
 
     # Compute rate
     if xx.size > 1:
@@ -128,24 +127,17 @@ if __name__ == "__main__":
     print("Rel. err.", rre)
     print("Convergence rate rel. err.:", rr)
 
-    # X refinement plot
+    # Plot
     plt.figure()
     plt.loglog(xx, rre, marker="s", label="Relative Error")
-    if xx.size > 1:
+    if xx.size>1:
         plt.loglog(xx, C * xx**r, "k-", label=f"x^{r:.4g}")
-    plt.xlabel("h")
+    if refinement == "x":
+        plt.xlabel("h")
+        plt.title("Error vs mesh spacing (log-log scale)")
+    else:
+        plt.xlabel("dt")
+        plt.title("Error vs # t-dofs (log-log scale)")
     plt.legend()
-    plt.title("Error vs mesh spacing (log-log scale)")
     plt.grid(True, which="both", ls="--")
     plt.show()
-
-    # T refinement plot
-    # plt.figure()
-    # plt.loglog(xx, rre, marker="s", label="Relative Error")
-    # if xx.size>1:
-    #     plt.loglog(xx, C * xx**r, "k-", label=f"x^{r:.4g}")
-    # plt.xlabel("dt")
-    # plt.legend()
-    # plt.title("Error vs # t-dofs (log-log scale)")
-    # plt.grid(True, which="both", ls="--")
-    # plt.show()
