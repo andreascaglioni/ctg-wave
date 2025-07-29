@@ -11,7 +11,48 @@ sys.path.append("../stochllg")
 from stochllg.utils import float_f
 
 
-def _assemble_slab_heat(Space, u0, Time, exact_rhs, boundary_data):
+def _impose_boundary_conditions(
+    sys_mat, rhs, t_dofs, bd_dofs_x, bd_data, tx_coords
+):
+    """
+    Modifies the system matrix and right-hand side vector to impose boundary conditions.
+
+    For degrees of freedom that belong to the boundary, the corresponding row in the system matrix is replaced with a delta function (identity), and the RHS entry is set to the boundary condition value.
+
+    Args:
+        sys_mat (scipy.sparse.spmatrix): The system matrix to be modified.
+        rhs (np.ndarray): The right-hand side vector to be modified.
+        t_dofs (np.ndarray): Array of time DOFs.
+        bd_dofs_x (np.ndarray): Array indicating which DOFs are on the boundary.
+        bd_data (Callable): Function that returns boundary condition values given space-time coordinates.
+        tx_coords (np.ndarray): Array of space-time coordinates for each DOF.
+
+    Returns:
+        Tuple[scipy.sparse.spmatrix, np.ndarray, np.ndarray]:
+            - System matrix with boundary conditions imposed.
+            - RHS vector with boundary conditions imposed.
+            - Array of boundary condition values for the current slab.
+    """
+
+    # 1. recover data
+    # Indicator function bd dofs in tx coords
+    dofs_boundary = np.kron(
+        np.ones((t_dofs.shape[0], 1)), bd_dofs_x.reshape(-1, 1)
+    ).flatten()
+    bc_curr_slab = bd_data(tx_coords)
+
+    # 2. Edit system matrix: Put to 0 entries corresponding to boundary
+    sys_mat = sys_mat.multiply((1.0 - dofs_boundary).reshape(-1, 1))
+    sys_mat += scipy.sparse.diags(dofs_boundary)
+
+    # 3. Edit RHS vector
+    rhs = rhs * (1.0 - dofs_boundary)
+    rhs += bc_curr_slab * dofs_boundary
+
+    return sys_mat, rhs, bc_curr_slab
+
+
+def _assemble_heat(Space, u0, Time, exact_rhs, boundary_data):
     # Assemble space-time matrices (linear PDEs -> Kronecker product t & x matrices)
     mass_matrix = scipy.sparse.kron(Time.matrix["mass"], Space.matrix["mass"])
     stiffness_matrix = scipy.sparse.kron(Time.matrix["mass"], Space.matrix["laplace"])
@@ -33,26 +74,14 @@ def _assemble_slab_heat(Space, u0, Time, exact_rhs, boundary_data):
     system_matrix += scipy.sparse.diags(dofs_at_t0)
     rhs[: Space.n_dofs] = u0
 
-    # Impose boundary conditions
-    # Idea: modify A and RHS so that, if the i-th dof belongs to the boundary, then the i-th equation enforces the BC instead of the equation wrt the i-th test function. This means that:
-    # * the i-th row of A becomes delta_{i,j}
-    # * the i-th entry of RHS becomes i-th coordinate of BC
-
-    # 1. recover data
-    dofs_boundary = np.kron(
-        np.ones((Time.dofs.shape[0], 1)), Space.boundary_dof_vector.reshape(-1, 1)
-    ).flatten()
-    bc_curr_slab = boundary_data(space_time_coords)
-
-    # 2. Edit system matrix
-    system_matrix = system_matrix.multiply(
-        (1.0 - dofs_boundary).reshape(-1, 1)
-    )  # put to 0 entries corresponding to boundary
-    system_matrix += scipy.sparse.diags(dofs_boundary)
-
-    # 3. Edit RHS vector
-    rhs = rhs * (1.0 - dofs_boundary)
-    rhs += bc_curr_slab * dofs_boundary
+    system_matrix, rhs, bc_curr_slab = _impose_boundary_conditions(
+        system_matrix,
+        rhs,
+        Time.dofs,
+        Space.boundary_dof_vector,
+        boundary_data,
+        space_time_coords
+    )
 
     return system_matrix, mass_matrix, stiffness_matrix, rhs, bc_curr_slab
 
@@ -71,7 +100,6 @@ def run_CTG_parabolic(
     err_type_t="l2",
     verbose=False,
 ):
-
     # coordinates initial condition wrt space-time basis
     init_time = time_slabs[0][0]
     u0 = initial_data(cart_prod_coords(np.array([[init_time]]), space_fe.dofs))
@@ -96,8 +124,8 @@ def run_CTG_parabolic(
         total_n_dofs_t += Time.n_dofs
 
         # Assemble linear system
-        system_matrix, mass_matrix, stiffness_matrix, rhs, ex_sol_slab = (
-            _assemble_slab_heat(space_fe, u0, Time, exact_rhs, boundary_data)
+        system_matrix, mass_matrix, stiffness_matrix, rhs, ex_sol_slab = _assemble_heat(
+            space_fe, u0, Time, exact_rhs, boundary_data
         )
 
         # Solve linear system (sparse direct solver)
@@ -116,7 +144,9 @@ def run_CTG_parabolic(
 
         # Get initial condition on next slab = final condition from this slab
         last_time_dof = Time.dofs.argmax()
-        u0 = sol_slab_dofs[last_time_dof * space_fe.n_dofs : (last_time_dof + 1) * space_fe.n_dofs]
+        u0 = sol_slab_dofs[
+            last_time_dof * space_fe.n_dofs : (last_time_dof + 1) * space_fe.n_dofs
+        ]
 
         # Error curr slab
         if callable(exact_sol):  # compute error only if exact_sol is a function
@@ -134,7 +164,8 @@ def run_CTG_parabolic(
             if verbose:
                 print("Current " + err_type_x + " error:", float_f(err_slabs[i]))
                 print(
-                    "Current " + err_type_x + " relative error:", float_f(err_slabs[i] / norm_u_slabs[i])
+                    "Current " + err_type_x + " relative error:",
+                    float_f(err_slabs[i] / norm_u_slabs[i]),
                 )
                 print("Done.\n")
 
