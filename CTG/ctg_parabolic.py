@@ -4,20 +4,35 @@ import scipy.sparse
 from dolfinx import fem, mesh
 
 sys.path.append("./")
-from CTG.utils import cart_prod_coords, compute_error_slab
+from CTG.utils import cart_prod_coords, compute_error_slab, float_f
 from CTG.FE_spaces import TimeFE
 
-sys.path.append("../stochllg")
-from stochllg.utils import float_f
 
-
-def _impose_boundary_conditions(
-    sys_mat, rhs, t_dofs, bd_dofs_x, bd_data, tx_coords
-):
+def _impose_IC_strong(u0, n_dofs_t, n_dofs_x, system_mat, rhs):
     """
-    Modifies the system matrix and right-hand side vector to impose boundary conditions.
+    Impose initial conditions strongly on the system matrix and right-hand side vector by overweiting the corresponding  DOFs in the system matrix and right-hand side.
+    Args:
+        u0 (array-like): Initial condition values for the spatial degrees of freedom at t=0.
+        n_dofs_t (int): Number of temporal degrees of freedom.
+        n_dofs_x (int): Number of spatial degrees of freedom.
+        system_mat (scipy.sparse matrix): System matrix to be modified.
+        rhs (array-like): Right-hand side vector to be modified.
+    Returns:
+        tuple: Modified system matrix and right-hand side vector with initial conditions imposed.
+    """
 
-    For degrees of freedom that belong to the boundary, the corresponding row in the system matrix is replaced with a delta function (identity), and the RHS entry is set to the boundary condition value.
+    dofs_at_t0 = np.zeros((n_dofs_t * n_dofs_x))  # indicator dofs at t_0
+    dofs_at_t0[:n_dofs_x] = 1.0
+
+    system_mat = system_mat.multiply((1.0 - dofs_at_t0).reshape(-1, 1))
+    system_mat += scipy.sparse.diags(dofs_at_t0)
+    rhs[:n_dofs_x] = u0
+    return system_mat, rhs
+
+
+def _impose_boundary_conditions(sys_mat, rhs, t_dofs, bd_dofs_x, bd_data, tx_coords):
+    """
+    Modifies the system matrix and right-hand side vector to impose boundary conditions. For degrees of freedom that belong to the boundary, the corresponding row in the system matrix is replaced with a delta function (identity), and the RHS entry is set to the boundary condition value.
 
     Args:
         sys_mat (scipy.sparse.spmatrix): The system matrix to be modified.
@@ -49,41 +64,36 @@ def _impose_boundary_conditions(
     rhs = rhs * (1.0 - dofs_boundary)
     rhs += bc_curr_slab * dofs_boundary
 
-    return sys_mat, rhs, bc_curr_slab
+    return sys_mat, rhs
 
 
 def _assemble_heat(Space, u0, Time, exact_rhs, boundary_data):
     # Assemble space-time matrices (linear PDEs -> Kronecker product t & x matrices)
-    mass_matrix = scipy.sparse.kron(Time.matrix["mass"], Space.matrix["mass"])
-    stiffness_matrix = scipy.sparse.kron(Time.matrix["mass"], Space.matrix["laplace"])
-    system_matrix = (
+    mass_mat = scipy.sparse.kron(Time.matrix["mass"], Space.matrix["mass"])
+    stiffness_mat = scipy.sparse.kron(Time.matrix["mass"], Space.matrix["laplace"])
+    system_mat = (
         scipy.sparse.kron(Time.matrix["derivative"], Space.matrix["mass"])
-        + stiffness_matrix
+        + stiffness_mat
     )
 
     # Assemble RHS vector as space-time mass * RHS on dofs
     # TODO better to use projection? I'll use higher order FEM!
     space_time_coords = cart_prod_coords(Time.dofs, Space.dofs)
-    rhs = mass_matrix.dot(exact_rhs(space_time_coords))
+    rhs = mass_mat.dot(exact_rhs(space_time_coords))
 
     # Impose initial condition strongly
-    dofs_at_t0 = np.zeros((Time.n_dofs * Space.n_dofs))  # indicator dofs at t_0
-    dofs_at_t0[: Space.n_dofs] = 1.0
+    system_mat, rhs = _impose_IC_strong(u0, Time.n_dofs, Space.n_dofs, system_mat, rhs)
 
-    system_matrix = system_matrix.multiply((1.0 - dofs_at_t0).reshape(-1, 1))
-    system_matrix += scipy.sparse.diags(dofs_at_t0)
-    rhs[: Space.n_dofs] = u0
-
-    system_matrix, rhs, bc_curr_slab = _impose_boundary_conditions(
-        system_matrix,
+    system_mat, rhs = _impose_boundary_conditions(
+        system_mat,
         rhs,
         Time.dofs,
         Space.boundary_dof_vector,
         boundary_data,
-        space_time_coords
+        space_time_coords,
     )
 
-    return system_matrix, mass_matrix, stiffness_matrix, rhs, bc_curr_slab
+    return system_mat, rhs
 
 
 def run_CTG_parabolic(
@@ -102,7 +112,8 @@ def run_CTG_parabolic(
 ):
     # coordinates initial condition wrt space-time basis
     init_time = time_slabs[0][0]
-    u0 = initial_data(cart_prod_coords(np.array([[init_time]]), space_fe.dofs))
+    tx_coords_t0 = cart_prod_coords(np.array([[init_time]]), space_fe.dofs)
+    u0 = initial_data(tx_coords_t0)
 
     total_n_dofs_t = 0
     sol_slabs = []
@@ -120,12 +131,12 @@ def run_CTG_parabolic(
         # Compute FE object for current slab TIME discretization
         msh_t = mesh.create_interval(comm, n_time, [slab[0], slab[1]])
         V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
-        Time = TimeFE(msh_t, V_t)
-        total_n_dofs_t += Time.n_dofs
+        time_fe = TimeFE(msh_t, V_t)
+        total_n_dofs_t += time_fe.n_dofs
 
         # Assemble linear system
-        system_matrix, mass_matrix, stiffness_matrix, rhs, ex_sol_slab = _assemble_heat(
-            space_fe, u0, Time, exact_rhs, boundary_data
+        system_matrix, rhs = _assemble_heat(
+            space_fe, u0, time_fe, exact_rhs, boundary_data
         )
 
         # Solve linear system (sparse direct solver)
@@ -143,7 +154,7 @@ def run_CTG_parabolic(
             print(f"Relative residual solver slab {i}:", float_f(rel_res_slab))
 
         # Get initial condition on next slab = final condition from this slab
-        last_time_dof = Time.dofs.argmax()
+        last_time_dof = time_fe.dofs.argmax()
         u0 = sol_slab_dofs[
             last_time_dof * space_fe.n_dofs : (last_time_dof + 1) * space_fe.n_dofs
         ]
@@ -151,14 +162,7 @@ def run_CTG_parabolic(
         # Error curr slab
         if callable(exact_sol):  # compute error only if exact_sol is a function
             err_slabs[i], norm_u_slabs[i] = compute_error_slab(
-                space_fe,
-                exact_sol,
-                err_type_x,
-                err_type_t,
-                Time,
-                sol_slab_dofs,
-                # mass_matrix,
-                # stiffness_matrix
+                space_fe, exact_sol, err_type_x, err_type_t, time_fe, sol_slab_dofs
             )
 
             if verbose:

@@ -83,14 +83,10 @@ class TimeFE:
             print(dof, ":", dof_t)
 
     def assemble_matrices(self):
-
         u = TrialFunction(self.V)
         phi = TestFunction(self.V)
-
         self.form["derivative"] = fem.form(grad(u)[0] * phi * dx)
-        
         self.form["mass"] = fem.form(u * phi * dx)
-
         for name, _form in self.form.items():
             dl_mat_curr = assemble_matrix(_form)
             dl_mat_curr.assemble()
