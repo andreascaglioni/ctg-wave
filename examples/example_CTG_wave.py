@@ -70,21 +70,21 @@ if __name__ == "__main__":
 
     # Plot u only
     n_dofs_tx_scalar = int(sol_slabs[0].size / 2)
-    xx = msh_x.geometry.x[:, 0]  # msh_x.geometry.x has shape (# nodes, 3)
+    xx = space_fe.dofs  # msh_x.geometry.x[:, 0]  # msh_x.geometry.x has shape (# nodes, 3)
     dt = t_slab_size / n_time
     n_dofs_t = n_time+1
     n_dofs_x = space_fe.n_dofs
     for i_s, slab in enumerate(time_slabs):
-        sol = sol_slabs[i_s]
-        u = sol[:n_dofs_tx_scalar]  # u in tx coordinates
-
+        sol_curr_slab = sol_slabs[i_s]
+        u_curr = sol_curr_slab[:n_dofs_tx_scalar]
         for i_t, t in enumerate(slab):
-            u_t_dofs = sol[i_t * n_dofs_x : (i_t + 1) * n_dofs_x]
+            u_t_dofs = sol_curr_slab[i_t * n_dofs_x : (i_t + 1) * n_dofs_x]
             plt.plot(xx, u_t_dofs, "o")
 
             X = cart_prod_coords(np.array([t]), xx)
             u_ex = exact_sol(X)[0, :]
-            plt.title("Slabs["+str(i_s)+"] = "+str(slab)+"; time "+str(i_t))
             plt.plot(xx, u_ex, ".-")
+
+            plt.title(f"Slabs[{i_s}] = {np.round(slab, 2)}; time {i_t}")
             plt.ylim([-1, 1])
             plt.show()

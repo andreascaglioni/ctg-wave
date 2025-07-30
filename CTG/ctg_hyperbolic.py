@@ -8,57 +8,67 @@ from CTG.utils import cart_prod_coords, compute_error_slab, float_f
 from CTG.FE_spaces import TimeFE, SpaceFE
 
 
-def _impose_IC_strong(X0, n_dofs_trial, n_dofs_x, system_mat, rhs):
+def _impose_IC_strong(X0, n_dofs_trial, n_dofs_x, sys_mat, rhs):
 
     # USE LIFTING METHOD 
     # x = x_0 + x_D
     # Ax = b -> A x_0 = f - A x_D
     # x = x_0 + x_D
-    
-    n_dofs_test, n_dofs_trial = system_mat.shape
+    # Impose homogeneous BC on x_0 at t=t_0
 
-
+    n_dofs_test, n_dofs_trial = sys_mat.shape
     n_dofs_scalar = int(n_dofs_trial/2)
+    n_dofs_scalar_test = int(n_dofs_test/2)
+    where_t0 = np.append(np.arange(n_dofs_x), np.arange(n_dofs_scalar, n_dofs_scalar + n_dofs_x))
+    where_t0_test = np.append(np.arange(n_dofs_x), np.arange(n_dofs_scalar_test, n_dofs_scalar_test + n_dofs_x))
 
-    x_D = np.zeros((n_dofs_trial,))  # seee IC as Dirichlet BC
-
-    where_t0 = np.arange(n_dofs_x)  
-    where_t0 = np.append(where_t0, np.arange(n_dofs_scalar, n_dofs_scalar + n_dofs_x))
-
+    x_D = np.zeros((n_dofs_trial,))  # see IC as Dirichlet BC -> lifting
     x_D[where_t0] = X0.flatten()  # dofs for t=t_0
 
-    A_x_D = system_mat.dot(x_D)
+    # Move IC to rhs
+    rhs = rhs - sys_mat.dot(x_D)
 
-    rhs = rhs - A_x_D
+    # Impose homegeneous BC on IC dofs
+    rhs[where_t0_test] = 0.
+    indicator_t0 = np.zeros((n_dofs_trial,))  # for broadcasting
+    indicator_t0[where_t0] = 1.
+    sys_mat = sys_mat.multiply(1.-indicator_t0.reshape((1, -1)))
+    sys_mat = sys_mat + scipy.sparse.diags(indicator_t0, shape=sys_mat.shape)
 
-    
+    return sys_mat, rhs, x_D
 
-    # n_dofs_scalar = n_dofs_trial * n_dofs_x
-    # # Indicator dofs with t=t_0
-    # dofs_at_t0 = np.zeros((2 * n_dofs_scalar))
-    # where_t_0 = np.arange(n_dofs_x)  
-    # where_t_0 = np.append(where_t_0, np.arange(n_dofs_scalar, n_dofs_scalar + n_dofs_x))  
-    # dofs_at_t0[where_t_0] = 1.0
-
-    # system_mat = system_mat.multiply((1.0 - dofs_at_t0).reshape(-1, 1))
-    # system_mat += scipy.sparse.diags(dofs_at_t0, shape=system_mat.shape)
-
-    # rhs[:n_dofs_x] = X0[0]
-    # rhs[n_dofs_scalar : n_dofs_scalar + n_dofs_x] = X0[1]
-
-    return system_mat, rhs, x_D
-
-
-def _impose_boundary_conditions(sys_mat, rhs, dofs_t_trial, dofs_x_bd, bd_data, tx_coords):
+#  system_mat, rhs, x_D = _impose_boundary_conditions(
+#     system_mat,
+#     rhs,
+#     time_fe.dofs_trial,
+#     space_fe.boundary_dof_vector,  # Indicator fun. boundary for *vectorial* f
+#     boundary_data,
+#     space_time_coords,
+# )
+def _impose_boundary_conditions(sys_mat, rhs, dofs_t_trial, indicator_bd_x, bd_data, tx_coords):
     # Use lifting method 
     # x = x_0 + x_D
     # A x_0 = f - A x_D
     # x = x_0 +  x_D
+    # Impose homogeneous BC on x_0 at x\in\partial D
+
+    pass
 
     n_dofs_test, n_dofs_trial = sys_mat.shape
+    indicator_bd_tx = np.kron(np.ones((dofs_t_trial.shape[0], 1)), indicator_bd_x.reshape(-1, 1)).flatten()
 
-    
-    x_D = bd_data(tx_coords).flatten()  # NB bd_data(tx_coords).shape=(2, n_dofs)
+    x_D = bd_data(tx_coords).flatten()  # lifting Dirichlet BC
+
+    # Move BC to rhs
+    rhs = rhs - sys_mat.dot(x_D)
+
+    # Impose homegeneous BC to system matrix and rhs vector
+    # rhs[where_bd_test] = 0.
+
+    # indicator_t0 = np.zeros((n_dofs_trial,))  # for broadcasting
+    # indicator_t0[where_t0] = 1.
+    # sys_mat = sys_mat.multiply(1.-indicator_t0.reshape((1, -1)))
+    # sys_mat = sys_mat + scipy.sparse.diags(indicator_t0, shape=sys_mat.shape)
 
     rhs = rhs - sys_mat.dot(x_D)
 
