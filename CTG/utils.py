@@ -10,6 +10,7 @@ import sys
 
 sys.path.append("./")
 from CTG.FE_spaces import SpaceFE, TimeFE
+import copy
 
 
 def cart_prod_coords(t_coords, x_coords):
@@ -36,7 +37,8 @@ def compute_error_slab(
     msh_t_ref = mesh.refine(msh_t)[0]
     p_Time = time_fe.V.element.basix_element.degree
     V_t_ref = fem.functionspace(msh_t_ref, ("Lagrange", p_Time))
-    time_fe_ref = TimeFE(msh_t_ref, V_t_ref)
+    V_t_ref_test = fem.functionspace(msh_t_ref, ("DG", p_Time-1))
+    time_fe_ref = TimeFE(msh_t_ref, V_t_ref, V_t_ref_test)
 
     # refine Space
     msh_x = space_fe.mesh
@@ -46,12 +48,12 @@ def compute_error_slab(
     space_fe_ref = SpaceFE(msh_x_ref, V_x_ref)
 
     # Interpolate exact sol in fine space # TODO works only for P=1!
-    fine_coords = cart_prod_coords(time_fe_ref.dofs, space_fe_ref.dofs)
+    fine_coords = cart_prod_coords(time_fe_ref.dofs_trial, space_fe_ref.dofs)
     ex_sol_ref = exact_sol(fine_coords)
 
     # Interpolate numerical sol using griddata (linear interpolation)
     # TODO works only for P=1!
-    coarse_coords = cart_prod_coords(time_fe.dofs, space_fe.dofs)
+    coarse_coords = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)
     sol_slab_ref = griddata(
         coarse_coords, sol_slab, fine_coords, method="linear", fill_value=0.0
     )
@@ -79,7 +81,7 @@ def compute_error_slab(
     elif err_type_t == "linf":
         err = -1.0
         norm_u = -1.0
-        for i, t in enumerate(time_fe.dofs):
+        for i, t in enumerate(time_fe.dofs_trial):
             dofs_c = sol_slab_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
             norm_c = sqrt(ip_space_ref.dot(dofs_c).dot(dofs_c))
             norm_u = max(norm_u, norm_c)

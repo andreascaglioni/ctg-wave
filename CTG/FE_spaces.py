@@ -6,13 +6,14 @@ from ufl import TestFunction, TrialFunction, dx, grad, inner
 
 
 class SpaceFE:
-    form = {}
-    matrix = {}
+    
 
     def __init__(self, mesh, V, boundary_data=None, boundary_D=None):
         assert (boundary_data is None and boundary_D is None) or (
             boundary_data is not None and boundary_D is not None
         )
+        self.form = {}
+        self.matrix = {}
         self.mesh = mesh
         self.V = V
         self.dofs = self.V.tabulate_dof_coordinates()
@@ -77,27 +78,35 @@ class SpaceFE:
 
 
 class TimeFE:
-    form = {}
-    matrix = {}
+    
 
-    def __init__(self, mesh, V):
+    def __init__(self, mesh, V, V_test):
+        self.form = {}
+        self.matrix = {}
         self.mesh = mesh
         self.V = V
-        self.dofs = self.V.tabulate_dof_coordinates()
+        self.V_test = V_test
+        self.dofs_trial = self.V.tabulate_dof_coordinates()
         # NB dofs are always 3d! -> Truncate
-        self.dofs = self.dofs[:, 0 : mesh.geometry.dim].reshape((-1, mesh.geometry.dim))
-        self.n_dofs = self.dofs.shape[0]
+        self.dofs_trial = self.dofs_trial[:, 0 : mesh.geometry.dim].reshape((-1, mesh.geometry.dim))
+        self.n_dofs_trial = self.dofs_trial.shape[0]
+
+        self.dofs_test = self.V_test.tabulate_dof_coordinates()
+        self.dofs_test = self.dofs_test[:, 0 : mesh.geometry.dim].reshape((-1, mesh.geometry.dim))
+        self.n_dofs_test = self.dofs_test.shape[0]
+        
         # self.print_dofs()  # debugging
         self.assemble_matrices()
 
     def print_dofs(self):
         print("\nTime DoFs:")
-        for dof, dof_t in zip(self.V.dofmap().dofs(), self.dofs):
+        for dof, dof_t in zip(self.V.dofmap().dofs(), self.dofs_trial):
             print(dof, ":", dof_t)
 
     def assemble_matrices(self):
         u = TrialFunction(self.V)
-        phi = TestFunction(self.V)
+        phi = TestFunction(self.V_test)
+
         self.form["derivative"] = fem.form(grad(u)[0] * phi * dx)
         self.form["mass"] = fem.form(u * phi * dx)
         for name, _form in self.form.items():
@@ -106,5 +115,5 @@ class TimeFE:
             dl_mat_curr2 = dl_mat_curr.getValuesCSR()[::-1]  # TODO why -1?
             self.matrix[name] = scipy.sparse.csr_matrix(
                 dl_mat_curr2,
-                shape=(self.n_dofs, self.n_dofs),
+                shape=(self.n_dofs_test, self.n_dofs_trial),
             )

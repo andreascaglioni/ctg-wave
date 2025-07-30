@@ -8,76 +8,92 @@ from CTG.utils import cart_prod_coords, compute_error_slab, float_f
 from CTG.FE_spaces import TimeFE, SpaceFE
 
 
-def _impose_IC_strong(X0, n_dofs_t, n_dofs_x, system_mat, rhs):
-    """
-    Impose initial conditions strongly on the system matrix and right-hand side vector by overweiting the corresponding  DOFs in the system matrix and right-hand side.
-    Args:
-        X0 (array-like): Initial condition values for the spatial degrees of freedom at t=0.
-        n_dofs_t (int): Number of temporal degrees of freedom (scalar variable).
-        n_dofs_x (int): Number of spatial degrees of freedom (scalar variable).
-        system_mat (scipy.sparse matrix): System matrix to be modified.
-        rhs (array-like): Right-hand side vector to be modified.
-    Returns:
-        tuple: Modified system matrix and right-hand side vector with initial conditions imposed.
-    """
+def _impose_IC_strong(X0, n_dofs_trial, n_dofs_x, system_mat, rhs):
 
-    n_dofs_scalar = n_dofs_t * n_dofs_x
-
-    dofs_at_t0 = np.zeros((2 * n_dofs_scalar))  # indicator dofs at t_0
-    dofs_at_t0[:n_dofs_x] = 1.0
-    dofs_at_t0[n_dofs_scalar : n_dofs_scalar + n_dofs_x] = 1.0
-
-    system_mat = system_mat.multiply((1.0 - dofs_at_t0).reshape(-1, 1))
-    system_mat += scipy.sparse.diags(dofs_at_t0)
-
-    rhs[:n_dofs_x] = X0[0]
-    rhs[n_dofs_scalar : n_dofs_scalar + n_dofs_x] = X0[1]
-
-    return system_mat, rhs
+    # USE LIFTING METHOD 
+    # x = x_0 + x_D
+    # Ax = b -> A x_0 = f - A x_D
+    # x = x_0 + x_D
+    
+    n_dofs_test, n_dofs_trial = system_mat.shape
 
 
-def _impose_boundary_conditions(sys_mat, rhs, t_dofs, bd_dofs_x, bd_data, tx_coords):
-    """
-    Modifies the system matrix and right-hand side vector to impose boundary conditions. For degrees of freedom that belong to the boundary, the corresponding row in the system matrix is replaced with a delta function (identity), and the RHS entry is set to the boundary condition value.
+    n_dofs_scalar = int(n_dofs_trial/2)
 
-    Args:
-        sys_mat (scipy.sparse.spmatrix): The system matrix to be modified.
-        rhs (np.ndarray): The right-hand side vector to be modified.
-        t_dofs (np.ndarray): Array of time DOFs.
-        bd_dofs_x (np.ndarray): Array indicating which DOFs are on the boundary.
-        bd_data (Callable): Function that returns boundary condition values given space-time coordinates.
-        tx_coords (np.ndarray): Array of space-time coordinates for each DOF.
+    x_D = np.zeros((n_dofs_trial,))  # seee IC as Dirichlet BC
 
-    Returns:
-        Tuple[scipy.sparse.spmatrix, np.ndarray, np.ndarray]:
-            - System matrix with boundary conditions imposed.
-            - RHS vector with boundary conditions imposed.
-            - Array of boundary condition values for the current slab.
-    """
+    where_t0 = np.arange(n_dofs_x)  
+    where_t0 = np.append(where_t0, np.arange(n_dofs_scalar, n_dofs_scalar + n_dofs_x))
 
-    # 1. recover data:
+    x_D[where_t0] = X0.flatten()  # dofs for t=t_0
 
-    # Indicator function bd dofs in tx coords SCALAR unknown
-    dofs_boundary = np.kron(
-        np.ones((t_dofs.shape[0], 1)), bd_dofs_x.reshape(-1, 1)
-    ).flatten()
+    A_x_D = system_mat.dot(x_D)
 
-    # Then for 2 components
-    # n_dofs_tx = tx_coords.shape[0]
-    # dofs_boundary = np.concat((dofs_boundary, dofs_boundary + n_dofs_tx))  # shift
+    rhs = rhs - A_x_D
 
-    bc_curr_slab = bd_data(tx_coords)  # shape (2, n_tx)
-    bc_curr_slab = np.concat((bc_curr_slab[0, :], bc_curr_slab[1, :]))
+    
 
-    # 2. Edit system matrix: Put to 0 entries corresponding to boundary
-    sys_mat = sys_mat.multiply((1.0 - dofs_boundary).reshape(-1, 1))
-    sys_mat += scipy.sparse.diags(dofs_boundary)
+    # n_dofs_scalar = n_dofs_trial * n_dofs_x
+    # # Indicator dofs with t=t_0
+    # dofs_at_t0 = np.zeros((2 * n_dofs_scalar))
+    # where_t_0 = np.arange(n_dofs_x)  
+    # where_t_0 = np.append(where_t_0, np.arange(n_dofs_scalar, n_dofs_scalar + n_dofs_x))  
+    # dofs_at_t0[where_t_0] = 1.0
 
-    # 3. Edit RHS vector
-    rhs = rhs * (1.0 - dofs_boundary)
-    rhs += bc_curr_slab * dofs_boundary
+    # system_mat = system_mat.multiply((1.0 - dofs_at_t0).reshape(-1, 1))
+    # system_mat += scipy.sparse.diags(dofs_at_t0, shape=system_mat.shape)
 
-    return sys_mat, rhs
+    # rhs[:n_dofs_x] = X0[0]
+    # rhs[n_dofs_scalar : n_dofs_scalar + n_dofs_x] = X0[1]
+
+    return system_mat, rhs, x_D
+
+
+def _impose_boundary_conditions(sys_mat, rhs, dofs_t_trial, dofs_x_bd, bd_data, tx_coords):
+    # Use lifting method 
+    # x = x_0 + x_D
+    # A x_0 = f - A x_D
+    # x = x_0 +  x_D
+
+    n_dofs_test, n_dofs_trial = sys_mat.shape
+
+    
+    x_D = bd_data(tx_coords).flatten()  # NB bd_data(tx_coords).shape=(2, n_dofs)
+
+    rhs = rhs - sys_mat.dot(x_D)
+
+    # # 1. recover data:
+
+    # # Indicator function bd dofs in tx coords
+    # dofs_boundary = np.kron(
+    #     np.ones((dofs_t_trial.shape[0], 1)), dofs_x_bd.reshape(-1, 1)
+    # ).flatten()
+
+    # bc_data_vals = bd_data(tx_coords)  # shape (2, n_tx)
+    # bc_data_vals = np.concat((bc_data_vals[0, :], bc_data_vals[1, :]))
+
+    # # 2. Edit system matrix: Put to 0 entries corresponding to boundary
+
+    # # expand system matrix to have as many rows as columns
+    # if sys_mat.shape[0] < sys_mat.shape[1]:
+    #     sys_mat = sys_mat.tocsr()
+    #     diff = abs(sys_mat.shape[0] - sys_mat.shape[1])
+    #     shape_addit = (diff, sys_mat.shape[1])
+    #     addit = scipy.sparse.csr_matrix(shape_addit)
+    #     sys_mat = scipy.sparse.vstack([sys_mat, addit])
+    
+    # sys_mat = sys_mat.multiply((1.0 - dofs_boundary).reshape(-1, 1))
+    # sys_mat += scipy.sparse.diags(dofs_boundary)
+
+    # # 3. Edit RHS vector
+    # if rhs.shape[0] < sys_mat.shape[0]:
+    #     diff = sys_mat.shape[0] - rhs.shape[0]
+    #     rhs = np.concatenate([rhs, np.zeros(diff)])
+    
+    # rhs = rhs * (1.0 - dofs_boundary)
+    # rhs += bc_data_vals * dofs_boundary
+
+    return sys_mat, rhs, x_D
 
 
 def _assemble_wave(space_fe, X0, time_fe, exact_rhs, boundary_data):
@@ -97,24 +113,24 @@ def _assemble_wave(space_fe, X0, time_fe, exact_rhs, boundary_data):
     system_mat = derivative_mat_2 + sys_mat_2
 
     # Assemble RHS vector as space-time mass * RHS on dofs
-    space_time_coords = cart_prod_coords(time_fe.dofs, space_fe.dofs)
+    space_time_coords = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)
     rhs = mass_mat.dot(exact_rhs(space_time_coords).T)  # (n, 2)
-    rhs = rhs.flatten()  # keep ROWS intact, stack one after the other
+    rhs = rhs.flatten("F")  # keep COLUMNS intact, stack one after the other
 
-    system_mat, rhs = _impose_IC_strong(
-        X0, time_fe.n_dofs, space_fe.n_dofs, system_mat, rhs
+    system_mat, rhs, x_IC = _impose_IC_strong(
+        X0, time_fe.n_dofs_trial, space_fe.n_dofs, system_mat, rhs
     )
 
-    system_mat, rhs = _impose_boundary_conditions(
+    system_mat, rhs, x_D = _impose_boundary_conditions(
         system_mat,
         rhs,
-        time_fe.dofs,
+        time_fe.dofs_trial,
         space_fe.boundary_dof_vector,  # Indicator fun. boundary for *vectorial* f
         boundary_data,
         space_time_coords,
     )
 
-    return system_mat, rhs
+    return system_mat, rhs, x_IC + x_D
 
 
 def run_CTG_wave(
@@ -139,8 +155,6 @@ def run_CTG_wave(
     # Scalar space FE
     V_x_scalar = fem.functionspace(space_fe.mesh, ("Lagrange", 1))
     space_fe_scalar = SpaceFE(space_fe.mesh, V_x_scalar)
-
-
     
     total_n_dofs_t = 0
     sol_slabs = []
@@ -156,44 +170,49 @@ def run_CTG_wave(
 
         # Time FE current slab
         msh_t = mesh.create_interval(comm, n_time, [slab[0], slab[1]])
-        V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
-        time_fe = TimeFE(msh_t, V_t)
-        total_n_dofs_t += time_fe.n_dofs
+        V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
+        V_t_test = fem.functionspace(msh_t, ("DG", order_t-1))
+        time_fe = TimeFE(msh_t, V_t_trial, V_t_test)
+        total_n_dofs_t += time_fe.n_dofs_trial
 
         # Assemble linear system
-        system_matrix, rhs = _assemble_wave(
+        system_matrix, rhs, x_D = _assemble_wave(
             space_fe, X0, time_fe, exact_rhs, boundary_data
         )
 
         # Solve linear system (sparse direct solver)
-        sol_slab_dofs = scipy.sparse.linalg.spsolve(system_matrix, rhs)
-        sol_slabs.append(sol_slab_dofs)
+        x0, info = scipy.sparse.linalg.lsqr(system_matrix, rhs)[:2]
+        x = x0 + x_D  # solution current slab with INITIAL and DIRICH conditions
+        sol_slabs.append(x)
 
         # Check residual
-        residual_slab = system_matrix.dot(sol_slab_dofs) - rhs
-        rel_res_slab = np.linalg.norm(residual_slab) / np.linalg.norm(sol_slab_dofs)
-        warn = False
-        if rel_res_slab > 1.0e-4:
-            warn = True
-            print("WARNING: ", end="")
-        if verbose or warn:
-            print(f"Relative residual solver slab {i}:", float_f(rel_res_slab))
+        # residual_slab = system_matrix.dot(x0) - rhs
+        # rel_res_slab = np.linalg.norm(residual_slab) / np.linalg.norm(x0)
+        # warn = False
+        # if rel_res_slab > 1.0e-4:
+        #     warn = True
+        #     print("WARNING: ", end="")
+        # if verbose or warn:
+        #     print(f"Relative residual solver slab {i}:", float_f(rel_res_slab))
 
         # Get initial condition on next slab = final condition from this slab
-        dofs_last_t = time_fe.dofs.argmax()
-        n_dofs_scalar = int(rhs.size / 2)  # number of t-x dofs for 1 scalar variable
-        u0 = sol_slab_dofs[
-            dofs_last_t * space_fe.n_dofs : (dofs_last_t + 1) * space_fe.n_dofs
+        dof_last_t = time_fe.dofs_trial.argmax()
+        
+        # number of t-x dofs for 1 scalar variable of 2
+        n_dofs_scalar = int(x0.size/2)  
+        
+        u0 = x0[
+            dof_last_t * space_fe.n_dofs : (dof_last_t + 1) * space_fe.n_dofs
         ]
-        v0 = sol_slab_dofs[
-            n_dofs_scalar + dofs_last_t * space_fe.n_dofs : n_dofs_scalar
-            + (dofs_last_t + 1) * space_fe.n_dofs
+        v0 = x0[
+            n_dofs_scalar + dof_last_t * space_fe.n_dofs : n_dofs_scalar
+            + (dof_last_t + 1) * space_fe.n_dofs
         ]
-        X0 = np.vstack((u0, v0))
+        X0 = np.vstack((u0, v0))  # must have shape (2, n_dofs_tx)
 
         # Error on u curr slab
         if callable(exact_sol):
-            dofs_u_slab = sol_slab_dofs[:n_dofs_scalar]
+            dofs_u_slab = x0[:n_dofs_scalar]
             exact_u = lambda X: exact_sol(X)[0, :]
 
             err_slabs[i], norm_u_slabs[i] = compute_error_slab(

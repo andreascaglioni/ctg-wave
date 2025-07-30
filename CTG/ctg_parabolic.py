@@ -132,7 +132,7 @@ def run_CTG_parabolic(
         msh_t = mesh.create_interval(comm, n_time, [slab[0], slab[1]])
         V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
         time_fe = TimeFE(msh_t, V_t)
-        total_n_dofs_t += time_fe.n_dofs
+        total_n_dofs_t += time_fe.n_dofs_trial
 
         # Assemble linear system
         system_matrix, rhs = _assemble_heat(
@@ -154,7 +154,7 @@ def run_CTG_parabolic(
             print(f"Relative residual solver slab {i}:", float_f(rel_res_slab))
 
         # Get initial condition on next slab = final condition from this slab
-        last_time_dof = time_fe.dofs.argmax()
+        last_time_dof = time_fe.dofs_trial.argmax()
         u0 = sol_slab_dofs[
             last_time_dof * space_fe.n_dofs : (last_time_dof + 1) * space_fe.n_dofs
         ]
