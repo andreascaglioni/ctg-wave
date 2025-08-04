@@ -8,7 +8,7 @@ from CTG.utils import cart_prod_coords, compute_error_slab, float_f
 from CTG.FE_spaces import TimeFE
 
 
-def _impose_IC_strong(u0, n_dofs_t, n_dofs_x, system_mat, rhs):
+def _impose_IC_strong(u0, n_dofs_t_trial, n_dofs_x, system_mat, rhs):
     """
     Impose initial conditions strongly on the system matrix and right-hand side vector by overweiting the corresponding  DOFs in the system matrix and right-hand side.
     Args:
@@ -21,7 +21,7 @@ def _impose_IC_strong(u0, n_dofs_t, n_dofs_x, system_mat, rhs):
         tuple: Modified system matrix and right-hand side vector with initial conditions imposed.
     """
 
-    dofs_at_t0 = np.zeros((n_dofs_t * n_dofs_x))  # indicator dofs at t_0
+    dofs_at_t0 = np.zeros((n_dofs_t_trial * n_dofs_x))  # indicator dofs at t_0
     dofs_at_t0[:n_dofs_x] = 1.0
 
     system_mat = system_mat.multiply((1.0 - dofs_at_t0).reshape(-1, 1))
@@ -30,7 +30,7 @@ def _impose_IC_strong(u0, n_dofs_t, n_dofs_x, system_mat, rhs):
     return system_mat, rhs
 
 
-def _impose_boundary_conditions(sys_mat, rhs, t_dofs, bd_dofs_x, bd_data, tx_coords):
+def _impose_boundary_conditions(sys_mat, rhs, t_dofs_trial, bd_dofs_x, bd_data, tx_coords):
     """
     Modifies the system matrix and right-hand side vector to impose boundary conditions. For degrees of freedom that belong to the boundary, the corresponding row in the system matrix is replaced with a delta function (identity), and the RHS entry is set to the boundary condition value.
 
@@ -51,18 +51,18 @@ def _impose_boundary_conditions(sys_mat, rhs, t_dofs, bd_dofs_x, bd_data, tx_coo
 
     # 1. recover data
     # Indicator function bd dofs in tx coords
-    dofs_boundary = np.kron(
-        np.ones((t_dofs.shape[0], 1)), bd_dofs_x.reshape(-1, 1)
+    dofs_bd_trial_tx = np.kron(
+        np.ones((t_dofs_trial.shape[0], 1)), bd_dofs_x.reshape(-1, 1)
     ).flatten()
     bc_curr_slab = bd_data(tx_coords)
 
     # 2. Edit system matrix: Put to 0 entries corresponding to boundary
-    sys_mat = sys_mat.multiply((1.0 - dofs_boundary).reshape(-1, 1))
-    sys_mat += scipy.sparse.diags(dofs_boundary)
+    sys_mat = sys_mat.multiply((1.0 - dofs_bd_trial_tx).reshape(-1, 1))
+    sys_mat += scipy.sparse.diags(dofs_bd_trial_tx)
 
     # 3. Edit RHS vector
-    rhs = rhs * (1.0 - dofs_boundary)
-    rhs += bc_curr_slab * dofs_boundary
+    rhs = rhs * (1.0 - dofs_bd_trial_tx)
+    rhs += bc_curr_slab * dofs_bd_trial_tx
 
     return sys_mat, rhs
 
@@ -78,16 +78,16 @@ def _assemble_heat(Space, u0, Time, exact_rhs, boundary_data):
 
     # Assemble RHS vector as space-time mass * RHS on dofs
     # TODO better to use projection? I'll use higher order FEM!
-    space_time_coords = cart_prod_coords(Time.dofs, Space.dofs)
+    space_time_coords = cart_prod_coords(Time.dofs_trial, Space.dofs)
     rhs = mass_mat.dot(exact_rhs(space_time_coords))
 
     # Impose initial condition strongly
-    system_mat, rhs = _impose_IC_strong(u0, Time.n_dofs, Space.n_dofs, system_mat, rhs)
+    system_mat, rhs = _impose_IC_strong(u0, Time.n_dofs_trial, Space.n_dofs, system_mat, rhs)
 
     system_mat, rhs = _impose_boundary_conditions(
         system_mat,
         rhs,
-        Time.dofs,
+        Time.dofs_trial,
         Space.boundary_dof_vector,
         boundary_data,
         space_time_coords,
@@ -131,7 +131,7 @@ def run_CTG_parabolic(
         # Compute FE object for current slab TIME discretization
         msh_t = mesh.create_interval(comm, n_time, [slab[0], slab[1]])
         V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
-        time_fe = TimeFE(msh_t, V_t)
+        time_fe = TimeFE(msh_t, V_t, V_t)
         total_n_dofs_t += time_fe.n_dofs_trial
 
         # Assemble linear system

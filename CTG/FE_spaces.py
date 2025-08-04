@@ -6,9 +6,8 @@ from ufl import TestFunction, TrialFunction, dx, grad, inner
 
 
 class SpaceFE:
-    
-
     def __init__(self, mesh, V, boundary_data=None, boundary_D=None):
+
         assert (boundary_data is None and boundary_D is None) or (
             boundary_data is not None and boundary_D is not None
         )
@@ -78,19 +77,18 @@ class SpaceFE:
 
 
 class TimeFE:
-    
-
-    def __init__(self, mesh, V, V_test):
+    def __init__(self, mesh, V_trial, V_test):
         self.form = {}
         self.matrix = {}
         self.mesh = mesh
-        self.V = V
-        self.V_test = V_test
-        self.dofs_trial = self.V.tabulate_dof_coordinates()
+        
+        self.V_trial = V_trial
+        self.dofs_trial = self.V_trial.tabulate_dof_coordinates()
         # NB dofs are always 3d! -> Truncate
         self.dofs_trial = self.dofs_trial[:, 0 : mesh.geometry.dim].reshape((-1, mesh.geometry.dim))
         self.n_dofs_trial = self.dofs_trial.shape[0]
-
+        
+        self.V_test = V_test
         self.dofs_test = self.V_test.tabulate_dof_coordinates()
         self.dofs_test = self.dofs_test[:, 0 : mesh.geometry.dim].reshape((-1, mesh.geometry.dim))
         self.n_dofs_test = self.dofs_test.shape[0]
@@ -99,12 +97,15 @@ class TimeFE:
         self.assemble_matrices()
 
     def print_dofs(self):
-        print("\nTime DoFs:")
-        for dof, dof_t in zip(self.V.dofmap().dofs(), self.dofs_trial):
+        print("\nTime DoFs TRIAL:")
+        for dof, dof_t in zip(self.V_trial.dofmap().dofs(), self.dofs_trial):
+            print(dof, ":", dof_t)
+        print("\nTime DoFs TEST:")
+        for dof, dof_t in zip(self.V_test.dofmap().dofs(), self.dofs_test):
             print(dof, ":", dof_t)
 
     def assemble_matrices(self):
-        u = TrialFunction(self.V)
+        u = TrialFunction(self.V_trial)
         phi = TestFunction(self.V_test)
 
         self.form["derivative"] = fem.form(grad(u)[0] * phi * dx)

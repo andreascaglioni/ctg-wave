@@ -35,7 +35,7 @@ def compute_error_slab(
     # refine Time
     msh_t = time_fe.mesh
     msh_t_ref = mesh.refine(msh_t)[0]
-    p_Time = time_fe.V.element.basix_element.degree
+    p_Time = time_fe.V_trial.element.basix_element.degree
     V_t_ref = fem.functionspace(msh_t_ref, ("Lagrange", p_Time))
     V_t_ref_test = fem.functionspace(msh_t_ref, ("DG", p_Time-1))
     time_fe_ref = TimeFE(msh_t_ref, V_t_ref, V_t_ref_test)
