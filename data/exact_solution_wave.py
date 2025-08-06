@@ -35,8 +35,8 @@ def exact_rhs(X):
 
 
 def boundary_data(X):
-    _t = X[:, 1]
-    _x = X[:, 0]
+    _t = X[:, 0]
+    _x = X[:, 1]
     z = 0 * _x
     return np.vstack((z, z))
 
@@ -44,6 +44,6 @@ def boundary_data(X):
 def initial_data(X):
     _t = X[:, 0]
     _x = X[:, 1]
-    u0 = np.sin(np.pi * _x) + 0.0 * _t
+    u0 = np.sin(np.pi * _x)
     v0 = 0.0 * _t
     return np.vstack((u0, v0))
