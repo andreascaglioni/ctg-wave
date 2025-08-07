@@ -6,12 +6,13 @@ from ufl import TestFunction, TrialFunction, dx, grad, inner
 
 
 class SpaceFE:
-    
-
     def __init__(self, mesh, V, boundary_data=None, boundary_D=None):
+        # Sanity check input
         assert (boundary_data is None and boundary_D is None) or (
             boundary_data is not None and boundary_D is not None
         )
+
+        # Initialize class members
         self.form = {}
         self.matrix = {}
         self.mesh = mesh
@@ -51,18 +52,21 @@ class SpaceFE:
             print(dof, ":", dof_x)
 
     def assemble_matrices(self):  # NB assemble matrices scalar components
-        if self.V.value_size > 1:
-            Vc = fem.functionspace(self.mesh, ("Lagrange", 1) )  # TODO handle different too!
+        if self.V.value_size > 1:  # if FE space has vectorial codomain, define the scalar version
+            
+            # Extract scalar subspace from vectorial space
+            V1 = self.V.sub(0).collapse()
+            # TODO handle different spaces too. Do I really have to define a new FE space?
 
             geo_dim = self.mesh.geometry.dim
             dc = self.dofs[:, 0 : geo_dim].reshape((-1, geo_dim))  
             nd = dc.shape[0]
         else:
-            Vc = self.V
+            V1 = self.V
             nd = self.n_dofs
 
-        u = TrialFunction(Vc)
-        phi = TestFunction(Vc)
+        u = TrialFunction(V1)
+        phi = TestFunction(V1)
         
         self.form["laplace"] = fem.form(inner(grad(u), grad(phi)) * dx)
         self.form["mass"] = fem.form(inner(u, phi) * dx)
@@ -78,8 +82,6 @@ class SpaceFE:
 
 
 class TimeFE:
-    
-
     def __init__(self, mesh, V, V_test):
         self.form = {}
         self.matrix = {}

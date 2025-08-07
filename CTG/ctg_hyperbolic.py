@@ -180,8 +180,8 @@ def run_CTG_wave(
 
         # Time FE current slab
         msh_t = mesh.create_interval(comm, n_time, [slab[0], slab[1]])
-        V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
-        V_t_test = fem.functionspace(msh_t, ("DG", order_t-1))
+        V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t, (2,)))
+        V_t_test = fem.functionspace(msh_t, ("DG", order_t-1, (2,)))
         time_fe = TimeFE(msh_t, V_t_trial, V_t_test)
         total_n_dofs_t += time_fe.n_dofs_trial
 
