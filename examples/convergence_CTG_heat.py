@@ -34,8 +34,8 @@ if __name__ == "__main__":
     )
 
     # Numerics data
-    n_refs = 7  # number of refinement
-    refinement = "x"
+    n_refs = 5  # number of refinement
+    refinement = "t"
 
     if refinement == "x":
         nn_x = 2 ** np.arange(n_refs, dtype=int)  # refine mesh shape
@@ -74,12 +74,12 @@ if __name__ == "__main__":
         time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
 
         # FE object for SPACE discretization
-        Space = SpaceFE(msh_x, V_x, boundary_data, boundary_D)
+        space_fe = SpaceFE(msh_x, V_x, boundary_data, boundary_D)
 
         # Time marching
         _, err_slabs, norm_slabs, nn_dofs[n_exp] = run_CTG_parabolic(
             comm,
-            Space,
+            space_fe,
             n_t,
             p_t,
             time_slabs,

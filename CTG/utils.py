@@ -35,10 +35,11 @@ def compute_error_slab(
     # refine Time
     msh_t = time_fe.mesh
     msh_t_ref = mesh.refine(msh_t)[0]
-    p_Time = time_fe.V.element.basix_element.degree
-    V_t_ref = fem.functionspace(msh_t_ref, ("Lagrange", p_Time))
-    V_t_ref_test = fem.functionspace(msh_t_ref, ("DG", p_Time-1))
-    time_fe_ref = TimeFE(msh_t_ref, V_t_ref, V_t_ref_test)
+    p_t_trial = time_fe.V_trial.element.basix_element.degree
+    V_t_trial_ref = fem.functionspace(msh_t_ref, ("Lagrange", p_t_trial))
+    p_t_test = time_fe.V_test.element.basix_element.degree
+    V_t_test_ref = fem.functionspace(msh_t_ref, ("DG", p_t_test))
+    time_fe_ref = TimeFE(msh_t_ref, V_t_trial_ref, V_t_test_ref)
 
     # refine Space
     msh_x = space_fe.mesh
@@ -66,28 +67,24 @@ def compute_error_slab(
     else:
         raise ValueError(f"Unknown error type x: {err_type_x}")
 
-    if err_type_t == "l2":
-        ip_tx = scipy.sparse.kron(time_fe_ref.matrix["mass"], ip_space_ref)
-    elif err_type_t == "linf":  # take max
-        pass
-    else:
-        raise ValueError(f"Unknown error type t: {err_type_t}")
-
     err_fun_ref = ex_sol_ref - sol_slab_ref
 
     if err_type_t == "l2":
+        ip_tx = scipy.sparse.kron(time_fe_ref.matrix["mass"], ip_space_ref)
         err = sqrt(ip_tx.dot(err_fun_ref).dot(err_fun_ref))
         norm_u = sqrt(ip_tx.dot(sol_slab_ref).dot(sol_slab_ref))
     elif err_type_t == "linf":
         err = -1.0
         norm_u = -1.0
         for i, t in enumerate(time_fe.dofs_trial):
-            dofs_c = sol_slab_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
-            norm_c = sqrt(ip_space_ref.dot(dofs_c).dot(dofs_c))
-            norm_u = max(norm_u, norm_c)
-            err_dofs_c = err_fun_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
-            err_c = sqrt(ip_space_ref.dot(err_dofs_c).dot(err_dofs_c))
-            err = max(err, err_c)
+            coords_u_t = sol_slab_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
+            norm_u_t = sqrt(ip_space_ref.dot(coords_u_t).dot(coords_u_t))
+            norm_u = max(norm_u, norm_u_t)
+            coords_err_t = err_fun_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
+            err_t = sqrt(ip_space_ref.dot(coords_err_t).dot(coords_err_t))
+            err = max(err, err_t)
+    else:
+        raise ValueError(f"Unknown error type t: {err_type_t}")
     return err, norm_u
 
 
