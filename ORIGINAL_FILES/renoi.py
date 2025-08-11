@@ -18,7 +18,7 @@ import numpy as np
 from dolfinx import mesh, fem, plot
 import ufl
 import basix
-from dolfinx.fem.petsc import assemble_matrix_block
+from dolfinx.fem.petsc import assemble_matrix_block, assemble_vector_block
 import pyvista
 
 
@@ -27,7 +27,7 @@ def error_L2(uh, u_ex, degree_raise=3):
     degree = uh.function_space.ufl_element().degree
     family = uh.function_space.ufl_element().element_family.name
     mesh = uh.function_space.mesh
-    W = fem.fem.functionspace(
+    W = fem.functionspace(
         mesh, (family, degree + degree_raise)
     )  # high-dim space for error function
 
@@ -70,7 +70,7 @@ def plot_sol(transparent, figsize, Space_u, u):
         pvplot.screenshot(
             "2D_function_warp.png",
             transparent_background=transparent,
-            window_size=[figsize, figsize],
+            # window_size=[figsize, figsize],
         )
     else:
         pvplot.show()
@@ -132,7 +132,7 @@ if __name__ == "__main__":
                 (np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))
             ),
         )
-        dofsV = mesh.locate_dofs_topological(XV, entity_dim=1, entities=facetsV)
+        dofsV = fem.locate_dofs_topological(XV, entity_dim=1, entities=facetsV)
         BCs = [fem.dirichletbc(0.0, dofsV, XV)]
 
         # weak form
@@ -160,7 +160,7 @@ if __name__ == "__main__":
                 + dt / 2 * ufl.inner(ufl.grad(V_old), b * q) * ufl.dx,
             ]
         )
-        L = fem.assemble_vector_block(l, a, bcs=BCs)
+        L = assemble_vector_block(l, a, bcs=BCs)
         
         for i in range(Nt):
             t += dt
@@ -179,6 +179,8 @@ if __name__ == "__main__":
             # Update solution at previous time step
             V_old.x.array[:] = V_new.x.array
             p_old.x.array[:] = p_new.x.array
+
+            plot_sol(True, figsize=None, Space_u=XV, u=V_new)
 
         # error in high-dim polynomial space
         V_ex_expr = V_exact()
