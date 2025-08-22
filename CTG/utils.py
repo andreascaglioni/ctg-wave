@@ -48,12 +48,12 @@ def compute_error_slab(
     V_x_ref = fem.functionspace(msh_x_ref, ("Lagrange", p_Space))
     space_fe_ref = SpaceFE(msh_x_ref, V_x_ref)
 
-    # Interpolate exact sol in fine space # TODO works only for P=1!
+    # Interpolate exact sol in fine space # TODO works only for Lagrangian FE
     fine_coords = cart_prod_coords(time_fe_ref.dofs_trial, space_fe_ref.dofs)
     ex_sol_ref = exact_sol(fine_coords)
 
     # Interpolate numerical sol using griddata (linear interpolation)
-    # TODO works only for P=1!
+    # TODO works only for Lagrangian FE
     coarse_coords = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)
     sol_slab_ref = griddata(
         coarse_coords, sol_slab, fine_coords, method="linear", fill_value=0.0

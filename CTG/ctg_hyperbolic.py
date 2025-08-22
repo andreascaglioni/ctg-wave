@@ -28,29 +28,6 @@ def _impose_initial_conditions(sys_mat, rhs, space_fe, indic_dof_t0_t_trial, ind
     sys_mat = sys_mat.multiply(indic_t0_tx_trial.reshape((-1, 1)))
 
     return sys_mat, rhs, x_IC
-    # ----------------------------------- - ---------------------------------- #
-
-    # n_test, n_trial = sys_mat.shape
-    # n_scalar_trial = int(n_trial/2)
-    # n_scalar_test = int(n_test/2)
-    # where_t0_scalar = np.arange(n_dofs_x)
-    # where_t0_trial = np.append(where_t0_scalar, n_scalar_trial + where_t0_scalar)
-    # where_t0_test = np.append(where_t0_scalar, n_scalar_test + where_t0_scalar)
-
-    # x_IC = np.zeros((n_trial,))  # see IC as Dirichlet BC -> lifting of IC coordinates
-    # x_IC[where_t0_trial] = X0.flatten()  # flatten() keeps ROWS intact
-
-    # # Move IC to rhs
-    # rhs = rhs - sys_mat.dot(x_IC)
-
-    # # Impose homegeneous IC strongly
-    # rhs[where_t0_test] = 0.
-    # indicator_t0 = np.zeros((n_trial,))  # for broadcasting
-    # indicator_t0[where_t0_trial] = 1.
-    # sys_mat = sys_mat.multiply(1.-indicator_t0.reshape((1, -1)))
-    # sys_mat = sys_mat + scipy.sparse.diags(indicator_t0, shape=sys_mat.shape)
-
-    # return sys_mat, rhs, x_IC
 
 
 def _impose_boundary_conditions(sys_mat, rhs, time_fe, indicator_bd_x, bd_data, tx_coords):
@@ -76,64 +53,6 @@ def _impose_boundary_conditions(sys_mat, rhs, time_fe, indicator_bd_x, bd_data, 
     sys_mat = sys_mat + scipy.sparse.diags(indic_bd_tx_test, shape=sys_mat.shape)
 
     return sys_mat, rhs, x_D
-    # ----------------------------------- - ---------------------------------- #
-
-
-    # n_dofs_t_test, n_dofs_t_trial = sys_mat.shape  # 
-
-    # # indicator boundary dofs in tx coords
-    # I_bd_tx_trial = np.kron(np.ones(n_dofs_t_trial, 1)), indicator_bd_x.reshape(-1, 1)).flatten()
-    # I_bd_tx_test = np.kron(np.ones((n_dofs_t_test, 1)), indicator_bd_x.reshape(-1, 1)).flatten()
-    # # dofs of \partial D in tx test space
-    # x_D = bd_data(tx_coords).flatten()  # lifting Dirichlet BC
-
-    # # Move BC to rhs
-    # rhs = rhs - sys_mat.dot(x_D)
-
-    # #  Modifty system to impose homogenoeus BC 
-    # # rhs[where_bd_test] = 0.
-    # rhs = rhs * (1. - I_bd_tx_test)
-
-    # # indicator_t0 = np.zeros((n_dofs_trial,))  # for broadcasting
-    # # indicator_t0[where_t0] = 1.
-    # # sys_mat = sys_mat.multiply(1.-indicator_t0.reshape((1, -1)))
-    # # sys_mat = sys_mat + scipy.sparse.diags(indicator_t0, shape=sys_mat.shape)
-
-    # # rhs = rhs - sys_mat.dot(x_D)
-
-    # # # 1. recover data:
-
-    # # # Indicator function bd dofs in tx coords
-    # # dofs_boundary = np.kron(
-    # #     np.ones((dofs_t_trial.shape[0], 1)), dofs_x_bd.reshape(-1, 1)
-    # # ).flatten()
-
-    # # bc_data_vals = bd_data(tx_coords)  # shape (2, n_tx)
-    # # bc_data_vals = np.concat((bc_data_vals[0, :], bc_data_vals[1, :]))
-
-    # # # 2. Edit system matrix: Put to 0 entries corresponding to boundary
-
-    # # # expand system matrix to have as many rows as columns
-    # # if sys_mat.shape[0] < sys_mat.shape[1]:
-    # #     sys_mat = sys_mat.tocsr()
-    # #     diff = abs(sys_mat.shape[0] - sys_mat.shape[1])
-    # #     shape_addit = (diff, sys_mat.shape[1])
-    # #     addit = scipy.sparse.csr_matrix(shape_addit)
-    # #     sys_mat = scipy.sparse.vstack([sys_mat, addit])
-    
-    # # sys_mat = sys_mat.multiply((1.0 - dofs_boundary).reshape(-1, 1))
-    # # sys_mat += scipy.sparse.diags(dofs_boundary)
-
-    # # # 3. Edit RHS vector
-    # # if rhs.shape[0] < sys_mat.shape[0]:
-    # #     diff = sys_mat.shape[0] - rhs.shape[0]
-    # #     rhs = np.concatenate([rhs, np.zeros(diff)])
-    
-    # # rhs = rhs * (1.0 - dofs_boundary)
-    # # rhs += bc_data_vals * dofs_boundary
-
-    # return sys_mat, rhs, x_D
-
 
 def _assemble_wave(space_fe, X0, time_fe, exact_rhs, boundary_data, boundary_IC):
     # Space-time matrices for 1d unknows

@@ -61,12 +61,7 @@ if __name__ == "__main__":
     # POST-PROCESS
     total_err = sqrt(np.sum(np.square(errs_slabs)))
     total_rel_err = total_err / sqrt(np.sum(np.square(norms_slabs)))
-    print(
-        "Total error",
-        float_f(total_err),
-        "Total relative error",
-        float_f(total_rel_err),
-    )
+    print("Total error", float_f(total_err), "Total relative error", float_f(total_rel_err))
 
     # Plot u only
     n_dofs_tx_scalar = int(dofs_X_slabs[0].size / 2)
