@@ -4,6 +4,9 @@ u = 0 on \partial D
 u = sin(pi*x) for t = 0
 
 We write separately the u and v components in the 1st roder formulation of the wave equation.
+
+Note: below X is always understood to contain coordinates in whoe space-time domain, even for initial and boundary data.
+NB: initial data and boundary data are always 0 outise of respecitvely initial time {t=0} and boundary \partial D
 """
 
 import numpy as np
@@ -50,9 +53,10 @@ def boundary_data_v(X):
 def initial_data_u(X):
     _t = X[:, 0]
     _x = X[:, 1]
-    return np.sin(np.pi * _x)
+    # return np.sin(np.pi * _x) * np.asarray(np.abs(_t)<1.e-10).nonzero()
+    return np.where(_t == 0, np.sin(np.pi * _x), 0.)
 
 def initial_data_v(X):
     _t = X[:, 0]
     _x = X[:, 1]
-    return 0.0 * _t
+    return 0. *_t

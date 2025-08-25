@@ -6,7 +6,7 @@ from ufl import TestFunction, TrialFunction, dx, grad, inner
 
 
 class SpaceFE:
-    def __init__(self, mesh, V, boundary_D):
+    def __init__(self, mesh, V, boundary_D=None):
         # Sanity check input
         assert V.value_size == 1  # always give 1d condomain FE space
 
@@ -24,7 +24,8 @@ class SpaceFE:
 
         self.assemble_matrices()
 
-        self.compute_bd_dofs(boundary_D)
+        if boundary_D is not None:
+            self.compute_bd_dofs(boundary_D)  # initialize self.boundary_dof_vector
 
     def assemble_matrices(self):
         u = TrialFunction(self.V)

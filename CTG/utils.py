@@ -14,8 +14,11 @@ import copy
 
 
 def cart_prod_coords(t_coords, x_coords):
-    if len(x_coords.shape) == 1:
+    if len(x_coords.shape) == 1:  # coordinates i wrong format (rank 1 array). assume 1d.
         x_coords = np.expand_dims(x_coords, 1)
+    if len(t_coords.shape) == 1:  # t coords in wron format assume 1d
+        t_coords = np.expand_dims(t_coords, 1)
+        
     long_t_coords = np.kron(t_coords, np.ones((x_coords.shape[0], 1)))
     long_x_coords = np.kron(np.ones((t_coords.shape[0], 1)), x_coords)
     return np.hstack((long_t_coords, long_x_coords))
