@@ -31,9 +31,7 @@ def compute_time_slabs(start_time, end_time, slab_size):
     return time_slabs
 
 
-def compute_error_slab(
-    space_fe, exact_sol, err_type_x, err_type_t, time_fe, sol_slab
-):
+def compute_error_slab(sol_slab, exact_sol, space_fe, time_fe, err_type_x, err_type_t):
 
     # refine Time
     msh_t = time_fe.mesh

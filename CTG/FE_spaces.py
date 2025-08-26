@@ -6,26 +6,27 @@ from ufl import TestFunction, TrialFunction, dx, grad, inner
 
 
 class SpaceFE:
-    def __init__(self, mesh, V, boundary_D=None):
+    def __init__(self, V, boundary_D=None):
         # Sanity check input
         assert V.value_size == 1  # always give 1d condomain FE space
 
-        self.mesh = mesh
+        self.mesh = V.mesh
         self.V = V
         self.form = {}
         self.matrix = {}
         
         dofs_raw = self.V.tabulate_dof_coordinates()
         # NB dofs are always 3d! -> Truncate
-        gdim = mesh.geometry.dim
+        gdim = self.mesh.geometry.dim
         self.dofs = dofs_raw[:, 0 : gdim].reshape((-1, gdim))
 
         self.n_dofs = self.dofs.shape[0]
 
         self.assemble_matrices()
-
+        
+        # initialize self.boundary_dof_vector (if boundary given)
         if boundary_D is not None:
-            self.compute_bd_dofs(boundary_D)  # initialize self.boundary_dof_vector
+            self.compute_bd_dofs(boundary_D)  
 
     def assemble_matrices(self):
         u = TrialFunction(self.V)
@@ -49,7 +50,7 @@ class SpaceFE:
         dofs_boundary = fem.locate_dofs_geometrical(self.V, boundary_D)
         bc = fem.dirichletbc(value=u_D, dofs=dofs_boundary)
 
-        # Compute indicator function of boundary
+        # Compute *indicator function* of boundary
         self.boundary_dof_vector = np.zeros((self.n_dofs * self.V.value_size,))
         for i in bc.dof_indices()[0]:  # bc.dof_indices() is 2-tuple
             self.boundary_dof_vector[i] = 1.0
@@ -74,26 +75,35 @@ class TimeFE:
         self.dofs_test = self.V_test.tabulate_dof_coordinates()[:, 0 : mesh.geometry.dim].reshape((-1, gdim))
         self.n_dofs_test = self.dofs_test.shape[0]
         
+        # Compute *indicator functions* of IC and FC (Final condition)
+        self.dof_IC_vector = np.zeros(self.n_dofs_trial)
+        self.dof_IC_vector[np.argmin(self.dofs_trial)] = 1.
+
+        self.dof_FC_vector = np.zeros(self.n_dofs_trial)
+        self.dof_FC_vector[np.argmax(self.dofs_trial)] = 1.
+
         self.assemble_matrices()
 
-    def get_IC_dofs(self, boundary_IC):
-        u_IC = fem.Function(self.V_trial)
-        u_IC.interpolate(lambda tt  : 0. * tt[0])
-        dofs_IC = fem.locate_dofs_geometrical(self.V_trial, boundary_IC)
-        ic = fem.dirichletbc(value=u_IC, dofs=dofs_IC)
-        indic_t0_trial = np.zeros((self.n_dofs_trial,))
-        for i in ic.dof_indices()[0]:
-            indic_t0_trial[i] = 1.0
-        
-        u_IC = fem.Function(self.V_test)
-        u_IC.interpolate(lambda tt  : 0. * tt[0])
-        dofs_IC = fem.locate_dofs_geometrical(self.V_test, boundary_IC)
-        ic = fem.dirichletbc(value=u_IC, dofs=dofs_IC)
-        indic_t0_test = np.zeros((self.n_dofs_test,))
-        for i in ic.dof_indices()[0]:
-            indic_t0_test[i] = 1.0
 
-        return indic_t0_trial, indic_t0_test
+
+    # def get_IC_dofs(self, boundary_IC):
+    #     u_IC = fem.Function(self.V_trial)
+    #     u_IC.interpolate(lambda tt  : 0. * tt[0])
+    #     dofs_IC = fem.locate_dofs_geometrical(self.V_trial, boundary_IC)
+    #     ic = fem.dirichletbc(value=u_IC, dofs=dofs_IC)
+    #     indic_t0_trial = np.zeros((self.n_dofs_trial,))
+    #     for i in ic.dof_indices()[0]:
+    #         indic_t0_trial[i] = 1.0
+        
+    #     u_IC = fem.Function(self.V_test)
+    #     u_IC.interpolate(lambda tt  : 0. * tt[0])
+    #     dofs_IC = fem.locate_dofs_geometrical(self.V_test, boundary_IC)
+    #     ic = fem.dirichletbc(value=u_IC, dofs=dofs_IC)
+    #     indic_t0_test = np.zeros((self.n_dofs_test,))
+    #     for i in ic.dof_indices()[0]:
+    #         indic_t0_test[i] = 1.0
+
+    #     return indic_t0_trial, indic_t0_test
 
     def print_dofs(self):
         print("\nTime DoFs TRIAL:")
