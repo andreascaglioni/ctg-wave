@@ -47,7 +47,7 @@ def compute_error_slab(sol_slab, exact_sol, space_fe, time_fe, err_type_x, err_t
     msh_x_ref = mesh.refine(msh_x)[0]
     p_Space = space_fe.V.element.basix_element.degree
     V_x_ref = fem.functionspace(msh_x_ref, ("Lagrange", p_Space))
-    space_fe_ref = SpaceFE(msh_x_ref, V_x_ref)
+    space_fe_ref = SpaceFE(V_x_ref)
 
     # Interpolate exact sol in fine space # TODO works only for Lagrangian FE
     fine_coords = cart_prod_coords(time_fe_ref.dofs_trial, space_fe_ref.dofs)
