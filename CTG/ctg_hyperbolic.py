@@ -94,8 +94,9 @@ def compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_f
         total_err = np.amax(err_slabs)
         total_norm_u = np.amax(norm_u_slabs)
     elif err_type_t == "l2":
-        total_err = sqrt(np.sum(np.square(err_slabs)))
-        total_norm_u = sqrt(np.sum(np.square(norm_u_slabs)))
+        ddt = np.array([ts[1]-ts[0] for ts in time_slabs])
+        total_err = sqrt(np.dot(ddt, np.square(err_slabs)))
+        total_norm_u = sqrt(np.dot(ddt, np.square(norm_u_slabs)))
     else:
         raise ValueError(f"Unknown error type in time: {err_type_t}")
     total_rel_err = total_err / total_norm_u
@@ -103,7 +104,7 @@ def compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_f
 
 def ctg_wave(comm, boundary_D, V_x, 
             start_time, end_time, t_slab_size, order_t,
-            boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v):
+            boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, verbose=False):
 
     time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
     space_fe = SpaceFE(V_x, boundary_D)
@@ -117,7 +118,8 @@ def ctg_wave(comm, boundary_D, V_x,
     # time stepping
     sol_slabs = []
     for i, slab in enumerate(time_slabs):
-        print(f"Slab_{i} = D x ({round(slab[0], 4)}, {round(slab[1], 4)}) ...")
+        if verbose:
+            print(f"Slab_{i} = D x ({round(slab[0], 4)}, {round(slab[1], 4)}) ...")
 
         # Assemble time FE curr slab
         msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
@@ -132,7 +134,10 @@ def ctg_wave(comm, boundary_D, V_x,
         # Solve
         X = scipy.sparse.linalg.spsolve(sys_mat, rhs)        
         residual = np.linalg.norm(sys_mat.dot(X) - rhs) / np.linalg.norm(X)
-        print(f"Relative residual norm: {residual:.2e}")
+
+        if verbose:
+            print(f"Relative residual norm: {residual:.2e}")
+        
         X = X + X0D  # add IC and BC
         sol_slabs.append(X)
 

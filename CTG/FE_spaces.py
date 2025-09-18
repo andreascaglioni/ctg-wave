@@ -84,27 +84,6 @@ class TimeFE:
 
         self.assemble_matrices()
 
-
-
-    # def get_IC_dofs(self, boundary_IC):
-    #     u_IC = fem.Function(self.V_trial)
-    #     u_IC.interpolate(lambda tt  : 0. * tt[0])
-    #     dofs_IC = fem.locate_dofs_geometrical(self.V_trial, boundary_IC)
-    #     ic = fem.dirichletbc(value=u_IC, dofs=dofs_IC)
-    #     indic_t0_trial = np.zeros((self.n_dofs_trial,))
-    #     for i in ic.dof_indices()[0]:
-    #         indic_t0_trial[i] = 1.0
-        
-    #     u_IC = fem.Function(self.V_test)
-    #     u_IC.interpolate(lambda tt  : 0. * tt[0])
-    #     dofs_IC = fem.locate_dofs_geometrical(self.V_test, boundary_IC)
-    #     ic = fem.dirichletbc(value=u_IC, dofs=dofs_IC)
-    #     indic_t0_test = np.zeros((self.n_dofs_test,))
-    #     for i in ic.dof_indices()[0]:
-    #         indic_t0_test[i] = 1.0
-
-    #     return indic_t0_trial, indic_t0_test
-
     def print_dofs(self):
         print("\nTime DoFs TRIAL:")
         for dof, dof_t in zip(self.V_trial.dofmap().dofs(), self.dofs_trial):
@@ -117,8 +96,8 @@ class TimeFE:
         u = TrialFunction(self.V_trial)
         phi = TestFunction(self.V_test)
 
-        self.form["mass"] = fem.form(inner(u, phi) * dx)
-        self.form["derivative"] = fem.form((grad(u)[0] * phi) * dx)
+        self.form["mass"] = fem.form(inner(u, grad(phi)[0]) * dx)
+        self.form["derivative"] = fem.form((grad(u)[0] * grad(phi)[0]) * dx)
         # self.form["derivative"] = fem.form(inner(grad(u)[0], phi) * dx)
                 
         for name, _form in self.form.items():

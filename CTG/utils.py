@@ -7,6 +7,7 @@ import numpy as np
 import scipy.sparse
 from scipy.interpolate import griddata
 import sys
+import matplotlib.pyplot as plt
 
 sys.path.append("./")
 from CTG.FE_spaces import SpaceFE, TimeFE
@@ -73,14 +74,15 @@ def compute_error_slab(sol_slab, exact_sol, space_fe, time_fe, err_type_x, err_t
     if err_type_t == "l2":
         ip_tx = scipy.sparse.kron(time_fe_ref.matrix["mass"], ip_space_ref)
         err = sqrt(ip_tx.dot(err_fun_ref).dot(err_fun_ref))
-        norm_u = sqrt(ip_tx.dot(sol_slab_ref).dot(sol_slab_ref))
+        norm_u = sqrt(ip_tx.dot(ex_sol_ref).dot(ex_sol_ref))
     elif err_type_t == "linf":
         err = -1.0
         norm_u = -1.0
         for i, t in enumerate(time_fe.dofs_trial):
-            coords_u_t = sol_slab_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
+            coords_u_t = ex_sol_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
             norm_u_t = sqrt(ip_space_ref.dot(coords_u_t).dot(coords_u_t))
             norm_u = max(norm_u, norm_u_t)
+
             coords_err_t = err_fun_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
             err_t = sqrt(ip_space_ref.dot(coords_err_t).dot(coords_err_t))
             err = max(err, err_t)
@@ -95,3 +97,78 @@ def float_f(x):
 
 def compute_rate(xx, yy):
     return np.log(yy[1:] / yy[:-1]) / np.log(xx[1:] / xx[:-1])
+
+
+def plot_uv_at_T(time_slabs, space_fe, sol_slabs, exact_sol_u, exact_sol_v):
+    n_x = space_fe.n_dofs
+    assert sol_slabs[0].size % 2 == 0, "sol_slabs[0].size must be even, got {}".format(sol_slabs[0].size)
+    n_dofs_scalar = int(sol_slabs[0].size / 2)
+    
+    X_final = sol_slabs[-1]
+    tx_final = cart_prod_coords(np.array([time_slabs[-1][1]]), space_fe.dofs)
+
+    plt.figure(figsize=(8, 5))
+    
+    u = X_final[n_dofs_scalar-n_x:n_dofs_scalar]
+    plt.plot(space_fe.dofs, u, "o-", label="u numerical")
+    plt.plot(space_fe.dofs, exact_sol_u(tx_final), "--", label="u exact")
+    
+    v = X_final[-n_x:]
+    plt.plot(space_fe.dofs, v, "s-", label="v numerical")
+    plt.plot(space_fe.dofs, exact_sol_v(tx_final), ":", label="v exact")
+
+    plt.title(f"u and v at final time t={round(time_slabs[-1][1], 4)}")
+    plt.legend()
+    plt.tight_layout()
+    
+    
+
+def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u, exact_sol_v):
+    n_x = space_fe.n_dofs
+    assert sol_slabs[0].size % 2 == 0, "sol_slabs[0].size must be even, got {}".format(sol_slabs[0].size)
+    n_dofs_scalar = int(sol_slabs[0].size / 2)
+
+    # Compute bounds y axis
+    uu = np.array([X[0:n_dofs_scalar] for X in sol_slabs])
+    umin = np.amin(uu)
+    umax = np.amax(uu)
+    vv = np.array([X[n_dofs_scalar:] for X in sol_slabs])
+    vmin = np.amin(vv)
+    vmax = np.amax(vv)
+
+    plt.figure(figsize=(10, 4))
+    for i, slab in enumerate(time_slabs):
+        X = sol_slabs[i]
+        plt.clf()
+
+        # Plot u on the left subplot
+        ax1 = plt.subplot(1, 2, 1)
+        ax1.plot(space_fe.dofs, X[0:n_x], ".", label=f"u at t={round(slab[0], 4)}")
+        tx = cart_prod_coords(np.array([slab[0]]), space_fe.dofs)
+        ax1.plot(space_fe.dofs, exact_sol_u(tx), "-", label="u exact")
+        ax1.set_title(f"u at t={round(slab[0], 4)}")
+        ax1.legend()
+        ax1.set_ylim((umin, umax))
+
+        # Plot v on the right subplot
+        ax2 = plt.subplot(1, 2, 2)
+        vv = X[n_dofs_scalar:n_dofs_scalar+n_x]
+        ax2.plot(space_fe.dofs, vv, ".", label=f"v at t={round(slab[0], 4)}")
+        ax2.plot(space_fe.dofs, exact_sol_v(tx), "-", label="v exact")
+        ax2.set_title(f"v at t={round(slab[0], 4)}")
+        ax2.legend()
+        ax2.set_ylim((vmin, vmax))
+        plt.tight_layout()
+        plt.pause(0.05)
+    plt.show()
+
+def plot_error_tt(time_slabs, err_slabs, norm_u_slabs):
+    times = [slab[1] for slab in time_slabs]
+    rel_errs = err_slabs / norm_u_slabs
+    plt.figure()
+    plt.plot(times, err_slabs, marker='o', label="error")
+    plt.plot(times, rel_errs, marker='o', label="relative error")
+    plt.xlabel("Time")
+    plt.title("Error over time")
+    plt.legend()
+    
