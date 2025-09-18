@@ -1,13 +1,20 @@
 """Implmenet CTG for 1st order formulation of the wave equation.
-Use separate variables for u and v instead of a 2d vectorial unknown."""
+Use separate variables for u and v instead of a 2d vectorial unknown.
+
+The wave equation reads: u_tt -  Δu = f
+and is equipped with initial and boundary conditions.
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
 
+import sys
+sys.path.insert(0, '.')
 from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt
 from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
+import os
 
 
 

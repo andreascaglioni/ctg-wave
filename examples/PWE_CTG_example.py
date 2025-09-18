@@ -1,0 +1,82 @@
+"""Example of CTG for 1st order formulation of the parametric wave equation (PWE) arising from the stochastic wave equation.
+Use separate variables for u and v instead of a 2d vectorial unknown, assigning to v the time derivative of the roginal unknown u.
+
+The PWE reads, in its first order formulation: 
+
+u_tt -  Δu = f
+
+and is equipped with initial and boundary conditions.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from mpi4py import MPI
+from dolfinx import fem, mesh
+
+import sys
+sys.path.insert(0, ".")
+from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt, param_LC_W
+from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
+from scipy.interpolate import interp1d
+
+
+
+
+if __name__ == "__main__":
+    # SETTINGS
+    seed = 0
+    np.random.seed(0)
+    comm = MPI.COMM_SELF
+    np.set_printoptions(formatter={"float_kind": float_f})
+
+    # PARAMETERS
+    # space
+    order_x = 1
+    n_cells_space = 40
+    msh_x = mesh.create_unit_interval(comm, n_cells_space)
+    V_x = fem.functionspace(msh_x, ("Lagrange", 1, (1,)))  # 1d space
+    boundary_D = lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))  # noqa: E731
+
+    # time
+    start_time = 0.0
+    end_time = 1.0
+    t_slab_size = 0.01
+    order_t = 1
+
+    # Exact sol
+    from data.data_param_wave_eq import (
+        exact_rhs_0,
+        exact_rhs_1,
+        boundary_data_u,
+        boundary_data_v,
+        initial_data_u,
+        initial_data_v
+    )
+
+    # error
+    err_type_x = "h1"
+    err_type_t = "linf"
+
+    print("COMPUTE")
+    # Sample a path for wiener process
+    y = np.random.standard_normal(100)
+    W_t = lambda tt : 10*param_LC_W(y, tt, T=end_time)[0]  # output 1D array
+    
+    time_slabs, space_fe, sol_slabs = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t)
+    
+    print("POST PROCESS")
+    # Compute error, total number of dofs
+    # n_dofs, total_err, total_rel_err, err_slabs, norm_u_slabs = compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
+    # print("Total error", float_f(total_err), "Total relative error", float_f(total_rel_err))
+    # print("error over slabls", err_slabs)
+
+    # Plot
+    tt = np.linspace(start_time, end_time, n_cells_space+1)
+    plt.plot(tt, param_LC_W(y, tt, T=end_time)[0], '.-')
+    plt.xlabel("t")
+    plt.title("Browniann motion sample path")
+
+    plot_uv_tt(time_slabs, space_fe, sol_slabs)
+    plot_uv_at_T(time_slabs, space_fe, sol_slabs)
+
+    plt.show()

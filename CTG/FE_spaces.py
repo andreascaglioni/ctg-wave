@@ -3,6 +3,7 @@ from dolfinx.fem.petsc import assemble_matrix
 import numpy as np
 import scipy.sparse
 from ufl import TestFunction, TrialFunction, dx, grad, inner
+from scipy.interpolate import interp1d
 
 
 class SpaceFE:
@@ -57,12 +58,14 @@ class SpaceFE:
 
 
 class TimeFE:
-    def __init__(self, mesh, V_trial, V_test):
+    def __init__(self, mesh, V_trial, V_test, W_t=None):
+        
         assert V_trial.value_size == 1 and V_test.value_size == 1
 
         self.form = {}
         self.matrix = {}
         self.mesh = mesh
+        self.W_t = W_t
         
         # Trial space
         gdim = mesh.geometry.dim
@@ -97,6 +100,15 @@ class TimeFE:
         phi = TestFunction(self.V_test)
 
         self.form["mass"] = fem.form(inner(u, grad(phi)[0]) * dx)
+
+        # assemble W*u. W always given as Callable
+        W_interpolant = interp1d(self.dofs_trial.flatten(), self.W_t(self.dofs_trial))
+        W_interp = lambda t : W_interpolant(t[0, :])  # dolfinx interpolates onto 3D points, each arranged as COLUMNS of 2d array (3, None)
+        W_fun = fem.Function(self.V_trial)
+        W_fun.interpolate(W_interp)
+        self.form["W_mass"] = fem.form(inner(W_fun * u, grad(phi)[0]) * dx)
+        self.form["WW_mass"] = fem.form(inner(W_fun * W_fun * u, grad(phi)[0]) * dx)
+
         self.form["derivative"] = fem.form((grad(u)[0] * grad(phi)[0]) * dx)
         # self.form["derivative"] = fem.form(inner(grad(u)[0], phi) * dx)
                 

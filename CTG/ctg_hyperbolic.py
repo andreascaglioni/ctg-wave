@@ -48,9 +48,11 @@ def impose_IC_BC(sys_mat, rhs, space_fe, time_fe, boundary_data_u, boundary_data
     return sys_mat, rhs, X_0D
  
 
-def assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_0, exact_rhs_1):
+def assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_0, exact_rhs_1, W_path):
     # Space-time matrices for scalar unknowns
     mass_mat = scipy.sparse.kron(time_fe.matrix["mass"], space_fe.matrix["mass"])
+    W_mass_mat = scipy.sparse.kron(time_fe.matrix["W_mass"], space_fe.matrix["mass"])
+    WW_mass_mat = scipy.sparse.kron(time_fe.matrix["WW_mass"], space_fe.matrix["mass"])
     stiffness_mat = scipy.sparse.kron(
         time_fe.matrix["mass"], space_fe.matrix["laplace"]
     )
@@ -59,7 +61,10 @@ def assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_
     )
 
     # Space-time matrices for vectorial unknowns
-    sys_mat = scipy.sparse.block_array([[derivative_mat, -mass_mat], [stiffness_mat, derivative_mat]])
+    sys_mat = scipy.sparse.block_array([[derivative_mat, None], [None, derivative_mat]]) 
+    sys_mat += scipy.sparse.block_array([[None, -mass_mat], [stiffness_mat, None]])
+    # the next term from the PWE
+    sys_mat += scipy.sparse.block_array([[W_mass_mat, None], [WW_mass_mat, W_mass_mat]])
     
     # Right hand side vector
     xt_dofs = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)
@@ -104,7 +109,7 @@ def compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_f
 
 def ctg_wave(comm, boundary_D, V_x, 
             start_time, end_time, t_slab_size, order_t,
-            boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, verbose=False):
+            boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t = None, verbose=False):
 
     time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
     space_fe = SpaceFE(V_x, boundary_D)
@@ -125,11 +130,10 @@ def ctg_wave(comm, boundary_D, V_x,
         msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
         V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
         V_t_test = fem.functionspace(msh_t, ("DG", order_t))
-        time_fe = TimeFE(msh_t, V_t_trial, V_t_test)
-        n_t = time_fe.n_dofs_trial
+        time_fe = TimeFE(msh_t, V_t_trial, V_t_test, W_t)
 
         # Assemble space-time linear system
-        sys_mat, rhs, X0D = assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_0, exact_rhs_1)
+        sys_mat, rhs, X0D = assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_0, exact_rhs_1, W_t)
 
         # Solve
         X = scipy.sparse.linalg.spsolve(sys_mat, rhs)        
