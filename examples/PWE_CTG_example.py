@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     print("COMPUTE")
     # Sample a path for wiener process
-    y = np.random.standard_normal(100)
+    y = 0*np.random.standard_normal(100)
     W_t = lambda tt : 1.*param_LC_W(y, tt, T=end_time)[0]  # output 1D array
     
     time_slabs, space_fe, sol_slabs = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t)
@@ -102,6 +102,16 @@ if __name__ == "__main__":
 
     # plot_uv_tt(time_slabs, space_fe, sol_slabs)
     
-    plot_uv_at_T(time_slabs, space_fe, sol_slabs)
+    u_fianl, v_final = plot_uv_at_T(time_slabs, space_fe, sol_slabs)
+
+    # Export DOFs, u_final, v_final to CSV
+    dofs = space_fe.dofs.flatten()
+    csv_filename_uv = "wave_uv_final.csv"
+    with open(csv_filename_uv, mode="w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["dof", "u_final", "v_final"])
+        for dof, u, v in zip(dofs, u_fianl, v_final):
+            writer.writerow([dof, u, v])
+    print(f"Exported DOFs, u_final, v_final to {csv_filename_uv}")
 
     plt.show()

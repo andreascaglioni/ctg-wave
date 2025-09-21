@@ -125,6 +125,7 @@ def plot_uv_at_T(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=
     plt.title(f"u and v at final time t={round(time_slabs[-1][1], 4)}")
     plt.legend()
     plt.tight_layout()
+    return u, v
     
     
 
