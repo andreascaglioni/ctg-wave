@@ -1,9 +1,15 @@
-"""Example of CTG for 1st order formulation of the parametric wave equation (PWE) arising from the stochastic wave equation.
-Use separate variables for u and v instead of a 2d vectorial unknown, assigning to v the time derivative of the roginal unknown u.
+"""Example of CTG for 1st order formulation of a parametric wave equation (PWE) arising from a stochastic wave equation using Doss-Sussmann trasnform and Levy-Ciesielski parametrization of Brownian motion.
 
-The PWE reads, in its first order formulation: 
+The first order formulation of the parametric wave equation (PWE) is:
 
-u_tt -  Δu = f
+    u_t = v + W u
+    v_t = Δu + W v + W² u + f
+
+where:
+    u: unknown function
+    v: time derivative of u
+    W: stochastic process (e.g., Brownian motion)
+    f: source term
 
 and is equipped with initial and boundary conditions.
 """
@@ -15,9 +21,12 @@ from dolfinx import fem, mesh
 
 import sys
 sys.path.insert(0, ".")
-from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt, param_LC_W
+from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt, param_LC_W, plot_energy_tt
 from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
 from scipy.interpolate import interp1d
+import csv
+
+
 
 
 
@@ -43,7 +52,7 @@ if __name__ == "__main__":
     t_slab_size = 0.01
     order_t = 1
 
-    # Exact sol
+    # Data problem
     from data.data_param_wave_eq import (
         exact_rhs_0,
         exact_rhs_1,
@@ -60,7 +69,7 @@ if __name__ == "__main__":
     print("COMPUTE")
     # Sample a path for wiener process
     y = np.random.standard_normal(100)
-    W_t = lambda tt : 10*param_LC_W(y, tt, T=end_time)[0]  # output 1D array
+    W_t = lambda tt : 1.*param_LC_W(y, tt, T=end_time)[0]  # output 1D array
     
     time_slabs, space_fe, sol_slabs = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t)
     
@@ -71,12 +80,28 @@ if __name__ == "__main__":
     # print("error over slabls", err_slabs)
 
     # Plot
+
+    # PLot W over tt 
     tt = np.linspace(start_time, end_time, n_cells_space+1)
-    plt.plot(tt, param_LC_W(y, tt, T=end_time)[0], '.-')
+    WW = W_t(tt)
+    plt.plot(tt, WW, '.-')
     plt.xlabel("t")
     plt.title("Browniann motion sample path")
 
-    plot_uv_tt(time_slabs, space_fe, sol_slabs)
+    # Plot Energy over tt
+    EE = plot_energy_tt(space_fe, sol_slabs, tt)
+
+    # Export to CSV file
+    csv_filename = "wave_energy.csv"
+    with open(csv_filename, mode="w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["tt", "WW", "EE"])
+        for t, w, e in zip(tt, WW, EE):
+            writer.writerow([t, w, e])
+    print(f"Exported data to {csv_filename}")
+
+    # plot_uv_tt(time_slabs, space_fe, sol_slabs)
+    
     plot_uv_at_T(time_slabs, space_fe, sol_slabs)
 
     plt.show()

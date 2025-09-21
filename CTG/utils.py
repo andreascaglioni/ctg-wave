@@ -1,13 +1,14 @@
 """Functions for the Continuous Time Galerkin method for the space-time integration
 of space-time problems, such as paraboic and hyperbolic PDEs."""
 
-from math import sqrt
+from math import sqrt, ceil, log, sqrt, pi
 from dolfinx import fem, mesh
 import numpy as np
 import scipy.sparse
 from scipy.interpolate import griddata
 import sys
 import matplotlib.pyplot as plt
+import warnings
 
 sys.path.append("./")
 from CTG.FE_spaces import SpaceFE, TimeFE
@@ -139,10 +140,11 @@ def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=No
     vv = np.array([X[n_dofs_scalar:] for X in sol_slabs])
     vmin = np.amin(vv)
     vmax = np.amax(vv)
-    tx = cart_prod_coords(np.array([slab[0]]), space_fe.dofs)
+
 
     plt.figure(figsize=(10, 4))
     for i, slab in enumerate(time_slabs):
+        tx = cart_prod_coords(np.array([slab[0]]), space_fe.dofs)
         X = sol_slabs[i]
         plt.clf()
 
@@ -166,7 +168,6 @@ def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=No
         ax2.set_ylim((vmin, vmax))
         plt.tight_layout()
         plt.pause(0.05)
-    plt.show()
 
 def plot_error_tt(time_slabs, err_slabs, norm_u_slabs):
     times = [slab[1] for slab in time_slabs]
@@ -178,20 +179,27 @@ def plot_error_tt(time_slabs, err_slabs, norm_u_slabs):
     plt.title("Error over time")
     plt.legend()
 
-"""
-Parametric expansions of the Wiener process.
+def plot_energy_tt(space_fe, sol_slabs, tt):
+    M =space_fe.matrix["mass"]  # mass
+    A = space_fe.matrix["laplace"]  # stiffness
+    n_x = space_fe.n_dofs
+    n_scalar = int(sol_slabs[0].size/2)
+    EE = np.zeros(tt.size)
+    for i, t, in enumerate(tt):
+        X = sol_slabs[i]
+        u = X[0:n_x]
+        v = X[n_scalar:n_scalar+n_x]
+        EE[i] = v @ M @ v + u @ A @ u  # np.dot(v, np.dot(M, v)) + np.dot(u, np.dot(A, u)) # + potential
+    plt.figure()
+    plt.plot(tt, EE, '.-')
+    plt.title("Energy (kinetic + potential) of PWE sample")
+    plt.tight_layout()
+    plt.xlabel(t)
 
-This module provides functions to construct the Wiener process using
-either a Levy-Ciesielski (LC) or Karhunen-Loeve (KL) expansion.
+    return EE
 
-Functions:
-    ``param_LC_W(tt, yy, T)``: Construct Wiener process using LC expansion.
-    ``param_KL_Brownian_motion(tt, yy)``: Construct Wiener process using KL expansion.
-"""
 
-from math import ceil, log, sqrt, pi
-import warnings
-import numpy as np
+
 
 
 def param_LC_W(yy, tt, T):
