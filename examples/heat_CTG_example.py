@@ -13,7 +13,7 @@ import sys
 
 sys.path.append("./")
 from CTG.utils import compute_time_slabs, cart_prod_coords, float_f
-from CTG.ctg_parabolic import run_CTG_parabolic
+from CTG_parabolic.ctg_parabolic import run_CTG_parabolic
 from CTG.FE_spaces import SpaceFE
 
 

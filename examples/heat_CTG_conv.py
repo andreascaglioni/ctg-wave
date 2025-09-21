@@ -11,7 +11,7 @@ from dolfinx import fem, mesh
 
 sys.path.append("./")
 from CTG.utils import compute_time_slabs, float_f, compute_rate
-from CTG.ctg_parabolic import run_CTG_parabolic
+from CTG_parabolic.ctg_parabolic import run_CTG_parabolic
 from CTG.FE_spaces import SpaceFE
 
 
