@@ -22,8 +22,9 @@ import csv
 import sys
 sys.path.insert(0, ".")
 from CTG.brownian_motion import param_LC_W
-from CTG.post_process_utils import float_f, plot_energy_tt, plot_uv_at_T
+from CTG.post_process_utils import float_f, compute_energy_tt, plot_uv_at_T, plot_uv_tt
 from CTG.ctg_hyperbolic import ctg_wave
+from CTG.utils import inverse_DS_transform
 
 
 if __name__ == "__main__":
@@ -63,30 +64,75 @@ if __name__ == "__main__":
 
     print("COMPUTE")
     # Sample a path for wiener process
-    y = 0*np.random.standard_normal(100)
+    y = 1*np.random.standard_normal(100)
     W_t = lambda tt : 1.*param_LC_W(y, tt, T=end_time)[0]  # output 1D array
     
-    time_slabs, space_fe, sol_slabs = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t)
+    time_slabs, sol_slabs, space_fe, time_fe_last = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t)
     
     print("POST PROCESS")
-    # Compute error, total number of dofs
+    # Compute post-processed quantities
     # n_dofs, total_err, total_rel_err, err_slabs, norm_u_slabs = compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
     # print("Total error", float_f(total_err), "Total relative error", float_f(total_rel_err))
     # print("error over slabls", err_slabs)
-
-    # Plot
-
-    # PLot W over tt 
     tt = np.linspace(start_time, end_time, n_cells_space+1)
     WW = W_t(tt)
+    EE, ppot, kkin = compute_energy_tt(space_fe, sol_slabs, tt)
+    n_x = space_fe.n_dofs
+    n_scalar=int(sol_slabs[0].size/2)
+    u_final = sol_slabs[-1][n_scalar-n_x:n_scalar]
+    v_final = sol_slabs[-1][-n_x:]
+    XX = inverse_DS_transform(sol_slabs[-1], W_t, space_fe, time_fe_last)
+    UU_final = XX[n_scalar-n_x:n_scalar]
+    VV_final = XX[-n_x:]
+
+
+
+    # Print
+    print("Total energy (kinetic+potential):", EE)
+
+    # Plots
+    plt.figure()
     plt.plot(tt, WW, '.-')
-    plt.xlabel("t")
     plt.title("Browniann motion sample path")
+    plt.tight_layout()
+    plt.xlabel("t")
 
-    # Plot Energy over tt
-    EE = plot_energy_tt(space_fe, sol_slabs, tt)
+    plt.figure()
+    plt.plot(tt, EE, '.-')
+    plt.title("Energy (kinetic + potential) of PWE sample")
+    plt.tight_layout()
+    plt.xlabel("t")
+    
+    # plot_uv_tt(time_slabs, space_fe, sol_slabs)
 
-    # Export to CSV file
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+    # Left axis: u_final and UU_final
+    axs[0].plot(space_fe.dofs, u_final, "o-", label="u numerical")
+    axs[0].plot(space_fe.dofs, UU_final, ".-", label="u (DS transform)")
+    axs[0].set_title(f"u at final time t={round(time_slabs[-1][1], 4)}")
+    axs[0].set_xlabel("x")
+    axs[0].legend()
+    axs[0].grid(True)
+    # Right axis: v_final and VV_final
+    axs[1].plot(space_fe.dofs, v_final, "s-", label="v numerical")
+    axs[1].plot(space_fe.dofs, VV_final, ".-", label="v (DS transform)")
+    axs[1].set_title(f"v at final time t={round(time_slabs[-1][1], 4)}")
+    axs[1].set_xlabel("x")
+    axs[1].legend()
+    axs[1].grid(True)
+    plt.tight_layout()
+
+    # Export to CSV u_final, v_final
+    dofs = space_fe.dofs.flatten()
+    csv_filename_uv = "wave_uv_final.csv"
+    with open(csv_filename_uv, mode="w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["dof", "u_final", "v_final"])
+        for dof, u_final, v_final in zip(dofs, u_final, v_final):
+            writer.writerow([dof, u_final, v_final])
+    print(f"Exported DOFs, u_final, v_final to {csv_filename_uv}")
+
+    # Export to CSV WW, EE
     csv_filename = "wave_energy.csv"
     with open(csv_filename, mode="w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -95,18 +141,6 @@ if __name__ == "__main__":
             writer.writerow([t, w, e])
     print(f"Exported data to {csv_filename}")
 
-    # plot_uv_tt(time_slabs, space_fe, sol_slabs)
-    
-    u_fianl, v_final = plot_uv_at_T(time_slabs, space_fe, sol_slabs)
-
-    # Export DOFs, u_final, v_final to CSV
-    dofs = space_fe.dofs.flatten()
-    csv_filename_uv = "wave_uv_final.csv"
-    with open(csv_filename_uv, mode="w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["dof", "u_final", "v_final"])
-        for dof, u, v in zip(dofs, u_fianl, v_final):
-            writer.writerow([dof, u, v])
-    print(f"Exported DOFs, u_final, v_final to {csv_filename_uv}")
-
     plt.show()
+
+    

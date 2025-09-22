@@ -81,23 +81,20 @@ def plot_uv_at_T(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=
     X_final = sol_slabs[-1]
     tx_final = cart_prod_coords(np.array([time_slabs[-1][1]]), space_fe.dofs)
 
-    plt.figure(figsize=(8, 5))
-
     u = X_final[n_dofs_scalar-n_x:n_dofs_scalar]
-    plt.plot(space_fe.dofs, u, "o-", label="u numerical")
+    v = X_final[-n_x:]
 
+    plt.figure()
+    plt.plot(space_fe.dofs, u, "o-", label="u numerical")
     if exact_sol_u is not None:
         plt.plot(space_fe.dofs, exact_sol_u(tx_final), "--", label="u exact")
-
-    v = X_final[-n_x:]
     plt.plot(space_fe.dofs, v, "s-", label="v numerical")
-
     if exact_sol_u is not None:
         plt.plot(space_fe.dofs, exact_sol_v(tx_final), ":", label="v exact")
-
     plt.title(f"u and v at final time t={round(time_slabs[-1][1], 4)}")
     plt.legend()
     plt.tight_layout()
+    
     return u, v
 
 
@@ -154,22 +151,30 @@ def plot_error_tt(time_slabs, err_slabs, norm_u_slabs):
     plt.legend()
 
 
-def plot_energy_tt(space_fe, sol_slabs, tt):
+def compute_energy_tt(space_fe, sol_slabs, tt):
+    """
+    Compute total, potential, and kinetic energy over time for a given solution.
+    Args:
+        space_fe: Finite element space object containing mass and stiffness matrices.
+        sol_slabs: List of solution vectors at each time step.
+        tt: Array of time points.
+    Returns:
+        Tuple of arrays: (total energy, potential energy, kinetic energy) at each time step.
+    """
+
     M =space_fe.matrix["mass"]  # mass
     A = space_fe.matrix["laplace"]  # stiffness
     n_x = space_fe.n_dofs
     n_scalar = int(sol_slabs[0].size/2)
-    EE = np.zeros(tt.size)
+    eenergy = np.zeros(tt.size)
+    ppot = np.zeros(tt.size)  # potential energy
+    kkin = np.zeros(tt.size)  # kinetic energy
     for i, t, in enumerate(tt):
         X = sol_slabs[i]
         u = X[0:n_x]
         v = X[n_scalar:n_scalar+n_x]
-        EE[i] = v @ M @ v + u @ A @ u  # np.dot(v, np.dot(M, v)) + np.dot(u, np.dot(A, u)) # + potential
-    plt.figure()
-    plt.plot(tt, EE, '.-')
-    plt.title("Energy (kinetic + potential) of PWE sample")
-    plt.tight_layout()
-    plt.xlabel(t)
-
-    return EE
+        ppot[i] = u @ A @ u
+        kkin[i] = v @ M @ v
+        eenergy[i] = ppot[i] + kkin[i]
+    return eenergy, ppot, kkin
 

@@ -154,4 +154,4 @@ def ctg_wave(comm, boundary_D, V_x,
         dofs_fc_tx = np.tile(dofs_fc_tx_scalar, 2).astype(bool)
         X0[dofs_ic_tx]=X[dofs_fc_tx]
     
-    return time_slabs, space_fe, sol_slabs
+    return time_slabs, sol_slabs, space_fe, time_fe
