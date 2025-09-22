@@ -41,10 +41,10 @@ if __name__ == "__main__":
     n_cells_space = 40
     msh_x = mesh.create_unit_interval(comm, n_cells_space)
     V_x = fem.functionspace(msh_x, ("Lagrange", order_x, (1,)))
+    
+    # Time
     t_slab_size = 0.1
     order_t = 1
-
-    # Time
     start_time = 0.
     end_time = 1.
     y = 1*np.random.standard_normal(100)
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     # print("error over slabls", err_slabs)
     tt = np.linspace(start_time, end_time, ceil(1/t_slab_size))
     WW = physics_params["W_t"](tt)
-    EE, ppot, kkin = compute_energy_tt(space_fe, sol_slabs, tt)
+    EE, ppot, kkin = compute_energy_tt(space_fe, sol_slabs)
     n_x = space_fe.n_dofs
     n_scalar=int(sol_slabs[0].size/2)
     u_final = sol_slabs[-1][n_scalar-n_x:n_scalar]

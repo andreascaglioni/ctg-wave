@@ -151,13 +151,13 @@ def plot_error_tt(time_slabs, err_slabs, norm_u_slabs):
     plt.legend()
 
 
-def compute_energy_tt(space_fe, sol_slabs, tt):
+def compute_energy_tt(space_fe, sol_slabs):
     """
     Compute total, potential, and kinetic energy over time for a given solution.
     Args:
         space_fe: Finite element space object containing mass and stiffness matrices.
         sol_slabs: List of solution vectors at each time step.
-        tt: Array of time points.
+        tt: Array of time points. Each point corresponds to  end of a time slab.
     Returns:
         Tuple of arrays: (total energy, potential energy, kinetic energy) at each time step.
     """
@@ -166,15 +166,16 @@ def compute_energy_tt(space_fe, sol_slabs, tt):
     A = space_fe.matrix["laplace"]  # stiffness
     n_x = space_fe.n_dofs
     n_scalar = int(sol_slabs[0].size/2)
-    eenergy = np.zeros(tt.size)
-    ppot = np.zeros(tt.size)  # potential energy
-    kkin = np.zeros(tt.size)  # kinetic energy
-    for i, t, in enumerate(tt):
-        X = sol_slabs[i]
+    eenergy = np.zeros(len(sol_slabs))
+    ppot = np.zeros(len(sol_slabs))  # potential energy
+    kkin = np.zeros(len(sol_slabs))  # kinetic energy
+
+    for i, X in enumerate(sol_slabs):
         u = X[0:n_x]
         v = X[n_scalar:n_scalar+n_x]
         ppot[i] = u @ A @ u
         kkin[i] = v @ M @ v
         eenergy[i] = ppot[i] + kkin[i]
+        
     return eenergy, ppot, kkin
 
