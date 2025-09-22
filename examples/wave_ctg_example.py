@@ -12,7 +12,8 @@ from dolfinx import fem, mesh
 
 import sys
 sys.path.insert(0, '.')
-from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt
+from CTG.post_process_utils import plot_error_tt, plot_uv_at_T, plot_uv_tt
+from CTG.utils import float_f
 from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
 import os
 

@@ -5,8 +5,9 @@ import scipy.sparse
 from dolfinx import fem, mesh
 
 sys.path.append("./")
-from CTG.utils import cart_prod_coords, compute_error_slab, float_f, compute_time_slabs
 from CTG.FE_spaces import TimeFE, SpaceFE
+from CTG.utils import cart_prod_coords, compute_error_slab, compute_time_slabs
+
 
 
 def impose_IC_BC(sys_mat, rhs, space_fe, time_fe, boundary_data_u, boundary_data_v, X_0):

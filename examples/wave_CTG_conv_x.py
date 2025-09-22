@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
 
-from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt, compute_rate
+from CTG.post_process_utils import plot_error_tt, plot_uv_at_T, plot_uv_tt
+from CTG.utils import float_f, compute_rate
 from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
 
 

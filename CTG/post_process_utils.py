@@ -1,0 +1,175 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from dolfinx import fem, io
+
+from CTG.utils import cart_prod_coords
+
+
+def float_f(x):
+    """
+    Format a float variable in scientific notation.
+
+    Args:
+        x (float): Input float.
+
+    Returns:
+        str: Formatted float as a string.
+    """
+    return f"{x:.4e}"
+
+
+def compute_rate(xx, yy):
+    """
+    Compute the logarithmic rate of change between consecutive elements of two arrays.
+
+    Args:
+        xx (numpy.ndarray): 1D array of x-coordinates.
+        yy (numpy.ndarray): 1D array of y-coordinates.
+
+    Returns:
+        numpy.ndarray: Logarithmic rates of change.
+    """
+
+    return np.log(yy[1:] / yy[:-1]) / np.log(xx[1:] / xx[:-1])
+
+def export_xdmf(msh, f, tt=np.array([]), filename="plot.xdmf"):
+    """
+    Exports a mesh and associated functions to an XDMF file.
+
+    Args:
+        msh (Mesh): The mesh to export.
+        f (Function or list of Function): The function(s) to export.
+        tt (numpy.ndarray, optional): Time steps for the functions. Defaults to an empty array.
+        filename (str, optional): Name of the output XDMF file. Defaults to "plot.xdmf".
+
+    Raises:
+        TypeError: If `f` is not a Function or a list of Functions.
+    """
+    xdmf = io.XDMFFile(msh.comm, filename, "w")
+    xdmf.write_mesh(msh)
+    if type(f) is list and type(f[0]) is fem.Function:
+        if tt.size == 0:
+            Warning("export_xdmf: Missing time tt. Using 1,2,...")
+            tt = np.linspace(0, len(f) - 1, len(f))
+        # export in sequence
+        for i in range(len(f)):
+            f[i].name = "f"
+            xdmf.write_function(f[i], tt[i])
+    elif type(f) is fem.Function:
+        f.name = "f"
+        xdmf.write_function(f)
+    else:
+        raise TypeError("f has unknown type for export")
+    xdmf.close()
+
+
+def plot_basis_functions(msh_x, V_x):
+    dim_V_x = V_x.tabulate_dof_coordinates().shape[0]
+    bf = fem.Function(V_x)  # piecewise linear!
+    for i in range(dim_V_x):
+        dofs_bf = np.zeros((dim_V_x))
+        dofs_bf[i] = 1.0
+        bf.x.array[:] = dofs_bf
+        export_xdmf(msh_x, bf, filename=f"bf{i}.xdmf")
+
+
+def plot_uv_at_T(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=None):
+    n_x = space_fe.n_dofs
+    assert sol_slabs[0].size % 2 == 0, "sol_slabs[0].size must be even, got {}".format(sol_slabs[0].size)
+    n_dofs_scalar = int(sol_slabs[0].size / 2)
+
+    X_final = sol_slabs[-1]
+    tx_final = cart_prod_coords(np.array([time_slabs[-1][1]]), space_fe.dofs)
+
+    plt.figure(figsize=(8, 5))
+
+    u = X_final[n_dofs_scalar-n_x:n_dofs_scalar]
+    plt.plot(space_fe.dofs, u, "o-", label="u numerical")
+
+    if exact_sol_u is not None:
+        plt.plot(space_fe.dofs, exact_sol_u(tx_final), "--", label="u exact")
+
+    v = X_final[-n_x:]
+    plt.plot(space_fe.dofs, v, "s-", label="v numerical")
+
+    if exact_sol_u is not None:
+        plt.plot(space_fe.dofs, exact_sol_v(tx_final), ":", label="v exact")
+
+    plt.title(f"u and v at final time t={round(time_slabs[-1][1], 4)}")
+    plt.legend()
+    plt.tight_layout()
+    return u, v
+
+
+def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=None):
+    n_x = space_fe.n_dofs
+    assert sol_slabs[0].size % 2 == 0, "sol_slabs[0].size must be even, got {}".format(sol_slabs[0].size)
+    n_dofs_scalar = int(sol_slabs[0].size / 2)
+
+    # Compute bounds y axis
+    uu = np.array([X[0:n_dofs_scalar] for X in sol_slabs])
+    umin = np.amin(uu)
+    umax = np.amax(uu)
+    vv = np.array([X[n_dofs_scalar:] for X in sol_slabs])
+    vmin = np.amin(vv)
+    vmax = np.amax(vv)
+
+
+    plt.figure(figsize=(10, 4))
+    for i, slab in enumerate(time_slabs):
+        tx = cart_prod_coords(np.array([slab[0]]), space_fe.dofs)
+        X = sol_slabs[i]
+        plt.clf()
+
+        # Plot u on the left subplot
+        ax1 = plt.subplot(1, 2, 1)
+        ax1.plot(space_fe.dofs, X[0:n_x], ".", label=f"u at t={round(slab[0], 4)}")
+        if exact_sol_u is not None:
+            ax1.plot(space_fe.dofs, exact_sol_u(tx), "-", label="u exact")
+        ax1.set_title(f"u at t={round(slab[0], 4)}")
+        ax1.legend()
+        ax1.set_ylim((umin, umax))
+
+        # Plot v on the right subplot
+        ax2 = plt.subplot(1, 2, 2)
+        vv = X[n_dofs_scalar:n_dofs_scalar+n_x]
+        ax2.plot(space_fe.dofs, vv, ".", label=f"v at t={round(slab[0], 4)}")
+        if exact_sol_v is not None:
+            ax2.plot(space_fe.dofs, exact_sol_v(tx), "-", label="v exact")
+        ax2.set_title(f"v at t={round(slab[0], 4)}")
+        ax2.legend()
+        ax2.set_ylim((vmin, vmax))
+        plt.tight_layout()
+        plt.pause(0.05)
+
+
+def plot_error_tt(time_slabs, err_slabs, norm_u_slabs):
+    times = [slab[1] for slab in time_slabs]
+    rel_errs = err_slabs / norm_u_slabs
+    plt.figure()
+    plt.plot(times, err_slabs, marker='o', label="error")
+    plt.plot(times, rel_errs, marker='o', label="relative error")
+    plt.xlabel("Time")
+    plt.title("Error over time")
+    plt.legend()
+
+
+def plot_energy_tt(space_fe, sol_slabs, tt):
+    M =space_fe.matrix["mass"]  # mass
+    A = space_fe.matrix["laplace"]  # stiffness
+    n_x = space_fe.n_dofs
+    n_scalar = int(sol_slabs[0].size/2)
+    EE = np.zeros(tt.size)
+    for i, t, in enumerate(tt):
+        X = sol_slabs[i]
+        u = X[0:n_x]
+        v = X[n_scalar:n_scalar+n_x]
+        EE[i] = v @ M @ v + u @ A @ u  # np.dot(v, np.dot(M, v)) + np.dot(u, np.dot(A, u)) # + potential
+    plt.figure()
+    plt.plot(tt, EE, '.-')
+    plt.title("Energy (kinetic + potential) of PWE sample")
+    plt.tight_layout()
+    plt.xlabel(t)
+
+    return EE
+

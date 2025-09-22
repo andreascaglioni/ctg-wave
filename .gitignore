@@ -1,6 +1,7 @@
 # Ignore cache directories and files
 __pycache__/
 */__pycache__/
+results/
 .vscode/
-
-tmp.py
+test_script.py
+*.csv

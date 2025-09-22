@@ -18,17 +18,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
-
+import csv
 import sys
 sys.path.insert(0, ".")
-from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt, param_LC_W, plot_energy_tt
-from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
-from scipy.interpolate import interp1d
-import csv
-
-
-
-
+from CTG.brownian_motion import param_LC_W
+from CTG.post_process_utils import float_f, plot_energy_tt, plot_uv_at_T
+from CTG.ctg_hyperbolic import ctg_wave
 
 
 if __name__ == "__main__":
