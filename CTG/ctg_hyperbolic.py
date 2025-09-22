@@ -7,6 +7,7 @@ from dolfinx import fem, mesh
 sys.path.append("./")
 from CTG.FE_spaces import TimeFE, SpaceFE
 from CTG.utils import cart_prod_coords, compute_error_slab, compute_time_slabs
+import warnings
 
 
 
@@ -108,9 +109,27 @@ def compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_f
     total_rel_err = total_err / total_norm_u
     return total_err, total_rel_err, total_n_dofs, err_slabs, norm_u_slabs
 
-def ctg_wave(comm, boundary_D, V_x, 
-            start_time, end_time, t_slab_size, order_t,
-            boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t = None, verbose=False):
+def ctg_wave(physics_params, numerics_params, verbose=False):
+
+    # Unpack inputs from dictionaries
+    boundary_D = physics_params["boundary_D"]
+    start_time = physics_params["start_time"]
+    end_time = physics_params["end_time"]
+    boundary_data_u = physics_params["boundary_data_u"]
+    boundary_data_v = physics_params["boundary_data_v"]
+    exact_rhs_0 = physics_params["exact_rhs_0"]
+    exact_rhs_1 = physics_params["exact_rhs_1"]
+    initial_data_u = physics_params["initial_data_u"]
+    initial_data_v = physics_params["initial_data_v"]
+    if "W_t" in physics_params:
+        W_t = physics_params["W_t"]
+    else:
+        warnings.warn("W_t not provided in physics_params, setting W_t to zero function.")
+        W_t = lambda t: 0.0
+    comm = numerics_params["comm"]
+    V_x = numerics_params["V_x"]
+    t_slab_size = numerics_params["t_slab_size"]
+    order_t = numerics_params["order_t"]
 
     time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
     space_fe = SpaceFE(V_x, boundary_D)

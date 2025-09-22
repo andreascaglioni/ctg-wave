@@ -67,7 +67,27 @@ if __name__ == "__main__":
     y = 1*np.random.standard_normal(100)
     W_t = lambda tt : 1.*param_LC_W(y, tt, T=end_time)[0]  # output 1D array
     
-    time_slabs, sol_slabs, space_fe, time_fe_last = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t)
+    # Example of a Python dictionary
+    physics_params = {
+        "boundary_D": boundary_D,
+        "start_time": start_time,
+        "end_time": end_time,
+        "boundary_data_u": boundary_data_u,
+        "boundary_data_v": boundary_data_v,
+        "exact_rhs_0": exact_rhs_0,
+        "exact_rhs_1": exact_rhs_1,
+        "initial_data_u": initial_data_u,
+        "initial_data_v": initial_data_v,
+        "W_t": W_t,
+    }
+    numerics_params = {
+        "comm": comm, 
+        "V_x": V_x,
+        "t_slab_size": t_slab_size,
+        "order_t": order_t,
+    }
+
+    time_slabs, sol_slabs, space_fe, time_fe_last = ctg_wave(physics_params, numerics_params)
     
     print("POST PROCESS")
     # Compute post-processed quantities
@@ -84,8 +104,6 @@ if __name__ == "__main__":
     XX = inverse_DS_transform(sol_slabs[-1], W_t, space_fe, time_fe_last)
     UU_final = XX[n_scalar-n_x:n_scalar]
     VV_final = XX[-n_x:]
-
-
 
     # Print
     print("Total energy (kinetic+potential):", EE)
