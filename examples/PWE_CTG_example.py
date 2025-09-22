@@ -15,6 +15,7 @@ and is equipped with initial and boundary conditions.
 """
 
 import numpy as np
+from math import ceil
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
@@ -39,16 +40,25 @@ if __name__ == "__main__":
     order_x = 1
     n_cells_space = 40
     msh_x = mesh.create_unit_interval(comm, n_cells_space)
-    V_x = fem.functionspace(msh_x, ("Lagrange", 1, (1,)))  # 1d space
-    boundary_D = lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))  # noqa: E731
-
-    # time
-    start_time = 0.0
-    end_time = 1.0
-    t_slab_size = 0.01
+    V_x = fem.functionspace(msh_x, ("Lagrange", order_x, (1,)))
+    t_slab_size = 0.1
     order_t = 1
 
-    # Data problem
+    # Time
+    start_time = 0.
+    end_time = 1.
+    y = 1*np.random.standard_normal(100)
+    def W_t(tt):  # return Callable[[numpy.ndarray], numpy.ndarray] 
+        tt = np.atleast_1d(tt)  # hande scalar tt
+        if len(tt.shape) == 1:
+            pass    # ok
+        if len(tt.shape) == 2 and tt.shape[1] == 3:  # input dolfinx interpolate. Purge last 2 rows
+            tt = tt[0, :]
+        WW = 1.*param_LC_W(y, tt, T=end_time)[0]
+        return WW  
+            
+    
+    # Problem data 
     from data.data_param_wave_eq import (
         exact_rhs_0,
         exact_rhs_1,
@@ -58,18 +68,15 @@ if __name__ == "__main__":
         initial_data_v
     )
 
-    # error
-    err_type_x = "h1"
-    err_type_t = "linf"
-
-    print("COMPUTE")
-    # Sample a path for wiener process
-    y = 1*np.random.standard_normal(100)
-    W_t = lambda tt : 1.*param_LC_W(y, tt, T=end_time)[0]  # output 1D array
+    numerics_params = {
+        "comm": comm, 
+        "V_x": V_x,
+        "t_slab_size": t_slab_size,
+        "order_t": order_t
+    }
     
-    # Example of a Python dictionary
     physics_params = {
-        "boundary_D": boundary_D,
+        "boundary_D": lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0)),
         "start_time": start_time,
         "end_time": end_time,
         "boundary_data_u": boundary_data_u,
@@ -78,15 +85,14 @@ if __name__ == "__main__":
         "exact_rhs_1": exact_rhs_1,
         "initial_data_u": initial_data_u,
         "initial_data_v": initial_data_v,
-        "W_t": W_t,
+        "W_t": W_t
     }
-    numerics_params = {
-        "comm": comm, 
-        "V_x": V_x,
-        "t_slab_size": t_slab_size,
-        "order_t": order_t,
-    }
+    
+    # error
+    err_type_x = "h1"
+    err_type_t = "linf"
 
+    print("COMPUTE")
     time_slabs, sol_slabs, space_fe, time_fe_last = ctg_wave(physics_params, numerics_params)
     
     print("POST PROCESS")
@@ -94,14 +100,14 @@ if __name__ == "__main__":
     # n_dofs, total_err, total_rel_err, err_slabs, norm_u_slabs = compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
     # print("Total error", float_f(total_err), "Total relative error", float_f(total_rel_err))
     # print("error over slabls", err_slabs)
-    tt = np.linspace(start_time, end_time, n_cells_space+1)
-    WW = W_t(tt)
+    tt = np.linspace(start_time, end_time, ceil(1/t_slab_size))
+    WW = physics_params["W_t"](tt)
     EE, ppot, kkin = compute_energy_tt(space_fe, sol_slabs, tt)
     n_x = space_fe.n_dofs
     n_scalar=int(sol_slabs[0].size/2)
     u_final = sol_slabs[-1][n_scalar-n_x:n_scalar]
     v_final = sol_slabs[-1][-n_x:]
-    XX = inverse_DS_transform(sol_slabs[-1], W_t, space_fe, time_fe_last)
+    XX = inverse_DS_transform(sol_slabs[-1], physics_params["W_t"], space_fe, time_fe_last)
     UU_final = XX[n_scalar-n_x:n_scalar]
     VV_final = XX[-n_x:]
 

@@ -102,10 +102,10 @@ class TimeFE:
         self.form["mass"] = fem.form(inner(u, grad(phi)[0]) * dx)
 
         # assemble W*u. W always given as Callable
-        W_interpolant = interp1d(self.dofs_trial.flatten(), self.W_t(self.dofs_trial))
-        W_interp = lambda t : W_interpolant(t[0, :])  # dolfinx interpolates onto 3D points, each arranged as COLUMNS of 2d array (3, None)
+        # W_interpolant = interp1d(self.dofs_trial.flatten(), self.W_t(self.dofs_trial))
+        # W_interp = lambda t : W_interpolant(t[0, :])  
         W_fun = fem.Function(self.V_trial)
-        W_fun.interpolate(W_interp)
+        W_fun.interpolate(self.W_t)
         self.form["W_mass"] = fem.form(inner(W_fun * u, grad(phi)[0]) * dx)
         self.form["WW_mass"] = fem.form(inner(W_fun * W_fun * u, grad(phi)[0]) * dx)
 

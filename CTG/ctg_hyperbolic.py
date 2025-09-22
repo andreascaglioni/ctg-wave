@@ -11,6 +11,9 @@ import warnings
 
 
 
+# TODO add possibility to use piecewsie polynomial in time (not only global polynomial) for each time slab
+
+
 def impose_IC_BC(sys_mat, rhs, space_fe, time_fe, boundary_data_u, boundary_data_v, X_0):
     xt_dofs = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)
     n_dofs_trial_scalar = int(sys_mat.shape[1]/2)
@@ -109,6 +112,8 @@ def compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_f
     total_rel_err = total_err / total_norm_u
     return total_err, total_rel_err, total_n_dofs, err_slabs, norm_u_slabs
 
+
+
 def ctg_wave(physics_params, numerics_params, verbose=False):
 
     # Unpack inputs from dictionaries
@@ -124,8 +129,8 @@ def ctg_wave(physics_params, numerics_params, verbose=False):
     if "W_t" in physics_params:
         W_t = physics_params["W_t"]
     else:
-        warnings.warn("W_t not provided in physics_params, setting W_t to zero function.")
-        W_t = lambda t: 0.0
+        warnings.warn("W_t not provided in physics_params, setting W_t to None.")
+        W_t = None
     comm = numerics_params["comm"]
     V_x = numerics_params["V_x"]
     t_slab_size = numerics_params["t_slab_size"]
