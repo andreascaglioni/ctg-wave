@@ -66,21 +66,21 @@ def assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_
     )
 
     # Space-time matrices for vectorial unknowns
-    sys_mat = scipy.sparse.block_array([[derivative_mat, None], [None, derivative_mat]]) 
-    sys_mat += scipy.sparse.block_array([[None, -mass_mat], [stiffness_mat, None]])
+    A = scipy.sparse.block_array([[derivative_mat, None], [None, derivative_mat]]) 
+    A += scipy.sparse.block_array([[None, -mass_mat], [stiffness_mat, None]])
     # the next term from the PWE
-    sys_mat += scipy.sparse.block_array([[W_mass_mat, None], [WW_mass_mat, W_mass_mat]])
+    A += scipy.sparse.block_array([[W_mass_mat, None], [WW_mass_mat, W_mass_mat]])
     
     # Right hand side vector
     xt_dofs = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)
     rhs0 = mass_mat.dot(exact_rhs_0(xt_dofs))
     rhs1 = mass_mat.dot(exact_rhs_1(xt_dofs))
-    rhs = np.concatenate((rhs0, rhs1))
+    b = np.concatenate((rhs0, rhs1))
 
     # Impose IC+BC
-    sys_mat, rhs, X0D = impose_IC_BC(sys_mat, rhs, space_fe, time_fe, boundary_data_u, boundary_data_v, X0)
+    A, b, X0D = impose_IC_BC(A, b, space_fe, time_fe, boundary_data_u, boundary_data_v, X0)
     
-    return sys_mat, rhs, X0D
+    return A, b, X0D, A_const, A_y
 
 
 def compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u):

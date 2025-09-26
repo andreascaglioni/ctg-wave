@@ -92,8 +92,12 @@ if __name__ == "__main__":
     err_type_x = "h1"
     err_type_t = "linf"
 
+    
+    
     print("COMPUTE")
     time_slabs, sol_slabs, space_fe, time_fe_last = ctg_wave(physics_params, numerics_params)
+    
+
     
     print("POST PROCESS")
     # Compute post-processed quantities
