@@ -4,7 +4,8 @@ import scipy.sparse
 from dolfinx import fem, mesh
 
 sys.path.append("./")
-from CTG.utils import cart_prod_coords, compute_error_slab, float_f
+from CTG.error import compute_error_slab
+from CTG.utils import cart_prod_coords, float_f
 from CTG.FE_spaces import TimeFE
 
 
@@ -132,7 +133,7 @@ def run_CTG_parabolic(
         msh_t = mesh.create_interval(comm, n_time, [slab[0], slab[1]])
         V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
         time_fe = TimeFE(msh_t, V_t, V_t)
-        total_n_dofs_t += time_fe.n_dofs_trial
+        total_n_dofs_t += time_fe.n_dofs
 
         # Assemble linear system
         system_matrix, rhs = _assemble_heat(
@@ -154,7 +155,7 @@ def run_CTG_parabolic(
             print(f"Relative residual solver slab {i}:", float_f(rel_res_slab))
 
         # Get initial condition on next slab = final condition from this slab
-        last_time_dof = time_fe.dofs_trial.argmax()
+        last_time_dof = time_fe.dofs.argmax()
         u0 = sol_slab_dofs[
             last_time_dof * space_fe.n_dofs : (last_time_dof + 1) * space_fe.n_dofs
         ]

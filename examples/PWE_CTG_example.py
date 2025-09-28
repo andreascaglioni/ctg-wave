@@ -21,8 +21,9 @@ from dolfinx import fem, mesh
 
 import sys
 sys.path.insert(0, ".")
+from CTG.error import compute_err
 from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt, param_LC_W, plot_energy_tt
-from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
+from CTG.ctg_hyperbolic import ctg_wave
 from scipy.interpolate import interp1d
 import csv
 
@@ -68,10 +69,9 @@ if __name__ == "__main__":
 
     print("COMPUTE")
     # Sample a path for wiener process
-    y = 0*np.random.standard_normal(100)
-    W_t = lambda tt : 1.*param_LC_W(y, tt, T=end_time)[0]  # output 1D array
-    
-    time_slabs, space_fe, sol_slabs = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t)
+    y = 1.*np.random.standard_normal(100)
+    W_t = lambda tt : 1.*param_LC_W(y, tt, T=end_time)[0]  # output: 1D array
+    time_slabs, space_fe, sol_slabs, total_n_dofs = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t)
     
     print("POST PROCESS")
     # Compute error, total number of dofs

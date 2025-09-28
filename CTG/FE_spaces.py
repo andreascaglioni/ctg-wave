@@ -58,9 +58,9 @@ class SpaceFE:
 
 
 class TimeFE:
-    def __init__(self, mesh, V_trial, V_test, W_t=None):
+    def __init__(self, mesh, V_trial, W_t=None):
         
-        assert V_trial.value_size == 1 and V_test.value_size == 1
+        assert V_trial.value_size == 1
 
         self.form = {}
         self.matrix = {}
@@ -69,45 +69,39 @@ class TimeFE:
         
         # Trial space
         gdim = mesh.geometry.dim
-        self.V_trial = V_trial
-        self.dofs_trial = self.V_trial.tabulate_dof_coordinates()[:, 0 : gdim].reshape((-1, gdim))
-        self.n_dofs_trial = self.dofs_trial.shape[0]
-
-        # Test space
-        self.V_test = V_test
-        self.dofs_test = self.V_test.tabulate_dof_coordinates()[:, 0 : mesh.geometry.dim].reshape((-1, gdim))
-        self.n_dofs_test = self.dofs_test.shape[0]
+        self.V = V_trial
+        self.dofs = self.V.tabulate_dof_coordinates()[:, 0 : gdim].reshape((-1, gdim))
+        self.n_dofs = self.dofs.shape[0]
         
         # Compute *indicator functions* of IC and FC (Final condition)
-        self.dof_IC_vector = np.zeros(self.n_dofs_trial)
-        self.dof_IC_vector[np.argmin(self.dofs_trial)] = 1.
+        self.dof_IC_vector = np.zeros(self.n_dofs)
+        self.dof_IC_vector[np.argmin(self.dofs)] = 1.
 
-        self.dof_FC_vector = np.zeros(self.n_dofs_trial)
-        self.dof_FC_vector[np.argmax(self.dofs_trial)] = 1.
+        self.dof_FC_vector = np.zeros(self.n_dofs)
+        self.dof_FC_vector[np.argmax(self.dofs)] = 1.
 
         self.assemble_matrices()
 
     def print_dofs(self):
         print("\nTime DoFs TRIAL:")
-        for dof, dof_t in zip(self.V_trial.dofmap().dofs(), self.dofs_trial):
-            print(dof, ":", dof_t)
-        print("\nTime DoFs TEST:")
-        for dof, dof_t in zip(self.V_test.dofmap().dofs(), self.dofs_test):
+        for dof, dof_t in zip(self.V.dofmap().dofs(), self.dofs):
             print(dof, ":", dof_t)
 
     def assemble_matrices(self):
-        u = TrialFunction(self.V_trial)
-        phi = TestFunction(self.V_test)
+        u = TrialFunction(self.V)
+        phi = TestFunction(self.V)
 
         self.form["mass"] = fem.form(inner(u, grad(phi)[0]) * dx)
 
-        # assemble W*u. W always given as Callable
-        W_interpolant = interp1d(self.dofs_trial.flatten(), self.W_t(self.dofs_trial))
-        W_interp = lambda t : W_interpolant(t[0, :])  # dolfinx interpolates onto 3D points, each arranged as COLUMNS of 2d array (3, None)
-        W_fun = fem.Function(self.V_trial)
-        W_fun.interpolate(W_interp)
-        self.form["W_mass"] = fem.form(inner(W_fun * u, grad(phi)[0]) * dx)
-        self.form["WW_mass"] = fem.form(inner(W_fun * W_fun * u, grad(phi)[0]) * dx)
+        # Assemble W*u, W**2*u, if W given
+        if self.W_t is not None:
+            # assemble W*u. W always given as Callable
+            W_interpolant = interp1d(self.dofs.flatten(), self.W_t(self.dofs))
+            W_interp = lambda t : W_interpolant(t[0, :])  # dolfinx interpolates onto 3D points, each arranged as COLUMNS of 2d array (3, None)
+            W_fun = fem.Function(self.V)
+            W_fun.interpolate(W_interp)
+            self.form["W_mass"] = fem.form(inner(W_fun * u, grad(phi)[0]) * dx)
+            self.form["WW_mass"] = fem.form(inner(W_fun * W_fun * u, grad(phi)[0]) * dx)
 
         self.form["derivative"] = fem.form((grad(u)[0] * grad(phi)[0]) * dx)
         # self.form["derivative"] = fem.form(inner(grad(u)[0], phi) * dx)
@@ -118,5 +112,5 @@ class TimeFE:
             dl_mat_curr2 = dl_mat_curr.getValuesCSR()[::-1]  # TODO why -1?
             self.matrix[name] = scipy.sparse.csr_matrix(
                 dl_mat_curr2,
-                shape=(self.n_dofs_test, self.n_dofs_trial),
+                shape=(self.n_dofs, self.n_dofs),
             )

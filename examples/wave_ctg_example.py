@@ -12,8 +12,9 @@ from dolfinx import fem, mesh
 
 import sys
 sys.path.insert(0, '.')
+from CTG.error import compute_err
 from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt
-from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
+from CTG.ctg_hyperbolic import ctg_wave
 import os
 
 
@@ -61,7 +62,7 @@ if __name__ == "__main__":
     
     print("POST PROCESS")
     # Compute error, total number of dofs
-    n_dofs, total_err, total_rel_err, err_slabs, norm_u_slabs = compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
+    n_dofs, total_err, total_rel_err, err_slabs, norm_u_slabs = compute_err(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
     print("Total error", float_f(total_err), "Total relative error", float_f(total_rel_err))
     print("error over slabls", err_slabs)
 

@@ -11,8 +11,9 @@ import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
 
+from CTG.error import compute_err
 from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt, compute_rate
-from CTG.ctg_hyperbolic import compute_err_ndofs, ctg_wave
+from CTG.ctg_hyperbolic import ctg_wave
 
 
 if __name__ == "__main__":
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         V_x = fem.functionspace(msh_x, ("Lagrange", 1, (1,)))  # 1d space
 
         time_slabs, space_fe, sol_slabs = ctg_wave(comm, boundary_D, V_x, start_time, end_time, dt, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v)
-        err[i], rel_err, nn_dofs[i], err_slabs, norm_u_slabs = compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
+        err[i], rel_err, nn_dofs[i], err_slabs, norm_u_slabs = compute_err(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
         print("Total error", float_f(err[i]) )
         # plot_uv_at_T(time_slabs, space_fe, sol_slabs, exact_sol_u, exact_sol_v)
         # plt.show()
