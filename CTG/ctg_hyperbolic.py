@@ -4,8 +4,14 @@ import scipy.sparse
 from dolfinx import fem, mesh
 
 sys.path.append("./")
-from CTG.utils import cart_prod_coords, float_f, compute_time_slabs
+from CTG.utils import cart_prod_coords, compute_error_slab, float_f, compute_time_slabs
 from CTG.FE_spaces import TimeFE, SpaceFE
+from CTG.utils import cart_prod_coords, compute_error_slab, compute_time_slabs
+import warnings
+
+
+
+# TODO add possibility to use piecewsie polynomial in time (not only global polynomial) for each time slab
 
 
 def impose_IC_BC(sys_mat, rhs, space_fe, time_fe, boundary_data_u, boundary_data_v, X_0):
@@ -60,21 +66,21 @@ def assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_
     )
 
     # Space-time matrices for vectorial unknowns
-    sys_mat = scipy.sparse.block_array([[derivative_mat, None], [None, derivative_mat]]) 
-    sys_mat += scipy.sparse.block_array([[None, -mass_mat], [stiffness_mat, None]])
+    A = scipy.sparse.block_array([[derivative_mat, None], [None, derivative_mat]]) 
+    A += scipy.sparse.block_array([[None, -mass_mat], [stiffness_mat, None]])
     # the next term from the PWE
-    sys_mat += scipy.sparse.block_array([[W_mass_mat, None], [WW_mass_mat, W_mass_mat]])
+    A += scipy.sparse.block_array([[W_mass_mat, None], [WW_mass_mat, W_mass_mat]])
     
     # Right hand side vector
     xt_dofs = cart_prod_coords(time_fe.dofs, space_fe.dofs)
     rhs0 = mass_mat.dot(exact_rhs_0(xt_dofs))
     rhs1 = mass_mat.dot(exact_rhs_1(xt_dofs))
-    rhs = np.concatenate((rhs0, rhs1))
+    b = np.concatenate((rhs0, rhs1))
 
     # Impose IC+BC
-    sys_mat, rhs, X0D = impose_IC_BC(sys_mat, rhs, space_fe, time_fe, boundary_data_u, boundary_data_v, X0)
+    A, b, X0D = impose_IC_BC(A, b, space_fe, time_fe, boundary_data_u, boundary_data_v, X0)
     
-    return sys_mat, rhs, X0D
+    return A, b, X0D, A_const, A_y
 
 
 def ctg_wave(comm, boundary_D, V_x, 
@@ -85,7 +91,15 @@ def ctg_wave(comm, boundary_D, V_x,
     space_fe = SpaceFE(V_x, boundary_D)
 
     # Vector of dofs IC (over first slab)
-    tx_coords = cart_prod_coords(np.array(time_slabs[0]), space_fe.dofs)  # shape (n_dofs_tx_scalar, 2) 
+
+    # I need time_fe object over 1st time slab to determine tx_coords
+    slab = time_slabs[0]
+    msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
+    V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
+    V_t_test = fem.functionspace(msh_t, ("DG", order_t))
+    time_fe = TimeFE(msh_t, V_t_trial, V_t_test, W_t)
+    
+    tx_coords = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)  # shape (n_dofs_tx_scalar, 2) 
     u0 = initial_data_u(tx_coords)  # shape (n_dofs_tx_scalar, )
     v0 = initial_data_v(tx_coords)  # shape (n_dofs_tx_scalar, )
     X0 = np.concatenate((u0, v0))  # shape (2*n_dofs_tx_scalar, )
