@@ -89,7 +89,7 @@ def plot_uv_at_T(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=
     if exact_sol_u is not None:
         plt.plot(space_fe.dofs, exact_sol_u(tx_final), "--", label="u exact")
     plt.plot(space_fe.dofs, v, "s-", label="v numerical")
-    if exact_sol_u is not None:
+    if exact_sol_v is not None:
         plt.plot(space_fe.dofs, exact_sol_v(tx_final), ":", label="v exact")
     plt.title(f"u and v at final time t={round(time_slabs[-1][1], 4)}")
     plt.legend()

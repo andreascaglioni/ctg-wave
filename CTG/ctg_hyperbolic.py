@@ -4,10 +4,10 @@ import scipy.sparse
 from dolfinx import fem, mesh
 
 sys.path.append("./")
-from CTG.utils import cart_prod_coords, compute_error_slab, float_f, compute_time_slabs
+from CTG.utils import cart_prod_coords, compute_time_slabs
+from CTG.post_process import float_f
 from CTG.FE_spaces import TimeFE, SpaceFE
-from CTG.utils import cart_prod_coords, compute_error_slab, compute_time_slabs
-import warnings
+from CTG.error import compute_err
 
 
 
@@ -80,7 +80,7 @@ def assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_
     # Impose IC+BC
     A, b, X0D = impose_IC_BC(A, b, space_fe, time_fe, boundary_data_u, boundary_data_v, X0)
     
-    return A, b, X0D, A_const, A_y
+    return A, b, X0D
 
 
 def ctg_wave(comm, boundary_D, V_x, 
@@ -97,9 +97,9 @@ def ctg_wave(comm, boundary_D, V_x,
     msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
     V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
     V_t_test = fem.functionspace(msh_t, ("DG", order_t))
-    time_fe = TimeFE(msh_t, V_t_trial, V_t_test, W_t)
+    time_fe = TimeFE(msh_t, V_t_trial, W_t)
     
-    tx_coords = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)  # shape (n_dofs_tx_scalar, 2) 
+    tx_coords = cart_prod_coords(time_fe.dofs, space_fe.dofs)  # shape (n_dofs_tx_scalar, 2) 
     u0 = initial_data_u(tx_coords)  # shape (n_dofs_tx_scalar, )
     v0 = initial_data_v(tx_coords)  # shape (n_dofs_tx_scalar, )
     X0 = np.concatenate((u0, v0))  # shape (2*n_dofs_tx_scalar, )
@@ -141,4 +141,4 @@ def ctg_wave(comm, boundary_D, V_x,
         X0[dofs_ic_tx]=X[dofs_fc_tx]
     
     total_n_dofs = space_fe.n_dofs * total_n_dofs_t
-    return time_slabs, space_fe, sol_slabs, total_n_dofs
+    return time_slabs, space_fe, sol_slabs, total_n_dofs, time_fe

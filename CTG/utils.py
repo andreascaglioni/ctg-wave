@@ -47,10 +47,6 @@ def inverse_DS_transform(xx, WW_fun, space_fe, time_fe):
     n_x = space_fe.n_dofs
     uu = xx[:n_scalar]
     vv = xx[n_scalar:]
-    WW = WW_fun(time_fe.dofs_trial)
+    WW = WW_fun(time_fe.dofs)
     WW_rep = np.repeat(WW, n_x)
     return np.concatenate((uu, vv + WW_rep*uu))
-
-
-
-
