@@ -4,101 +4,47 @@ import scipy.sparse
 from dolfinx import fem, mesh
 
 sys.path.append("./")
-from CTG.utils import cart_prod_coords, compute_time_slabs
-from CTG.post_process import float_f
 from CTG.FE_spaces import TimeFE, SpaceFE
-from CTG.error import compute_err
+from CTG.assemble_XT import assemble_ctg
+from CTG.utils import cart_prod_coords, compute_time_slabs
+import warnings
 
+def ctg_wave(physics_params, numerics_params, verbose=False):
 
+    # Unpack inputs from dictionaries
+    boundary_D = physics_params["boundary_D"]
+    start_time = physics_params["start_time"]
+    end_time = physics_params["end_time"]
+    boundary_data_u = physics_params["boundary_data_u"]
+    boundary_data_v = physics_params["boundary_data_v"]
+    exact_rhs_0 = physics_params["exact_rhs_0"]
+    exact_rhs_1 = physics_params["exact_rhs_1"]
+    initial_data_u = physics_params["initial_data_u"]
+    initial_data_v = physics_params["initial_data_v"]
+    if "W_t" in physics_params:
+        W_t = physics_params["W_t"]
+    else:
+        warnings.warn("W_t not provided in physics_params, setting W_t to None.")
+        W_t = None
 
-# TODO add possibility to use piecewsie polynomial in time (not only global polynomial) for each time slab
-
-
-def impose_IC_BC(sys_mat, rhs, space_fe, time_fe, boundary_data_u, boundary_data_v, X_0):
-    xt_dofs = cart_prod_coords(time_fe.dofs, space_fe.dofs)
-    n_dofs_trial_scalar = int(sys_mat.shape[1]/2)
-    n_x = space_fe.n_dofs
-    n_t = time_fe.n_dofs
-
-    # Indicator dofs IC    
-    ic_dofs_scalar = np.kron(time_fe.dof_IC_vector, np.ones((n_x, )))
-    # Indicator dofs BD
-    bd_dofs_scalar = np.kron(np.ones((n_t, )), space_fe.boundary_dof_vector)
-    # Find compatibility dofs: those where IC nad BC are both imposed
-    compat_dofs_scalar = np.logical_and(ic_dofs_scalar == 1, bd_dofs_scalar == 1)
-    
-    # Vectorial indicator functions
-    ic_bd_dofs_scalar = np.logical_or(ic_dofs_scalar, bd_dofs_scalar).astype(float)
-    ic_bd_dofs = np.tile(ic_bd_dofs_scalar, 2)
-    compat_dofs = np.tile(compat_dofs_scalar, 2)
-    
-    # Boundary dofs 
-    X_D = np.concatenate((boundary_data_u(xt_dofs), boundary_data_v(xt_dofs)))
-    
-    # Compbine IC and BC
-    X_0D = X_0 + X_D - np.where(compat_dofs, X_0, 0.)
-    # here we removed the values of X0 on the compatibility dofs. This is better than the other way round because the boundary condition is always givena and exact, the initial dcondition may be only appproximately computed.
-
-    # Lift IC+BC
-    rhs = rhs - sys_mat.dot(X_0D)
-
-    # Impose Homogenoeous BC+IC on rhs
-    rhs = rhs * (1-ic_bd_dofs)
-
-    # Impose homogeneous BC+IC on matrix
-    sys_mat = sys_mat.multiply((1-ic_bd_dofs).reshape((-1, 1)))
-    sys_mat += scipy.sparse.diags(ic_bd_dofs, offsets=0, shape=sys_mat.shape)  # u
-    sys_mat += scipy.sparse.diags(ic_bd_dofs, offsets=n_dofs_trial_scalar, shape=sys_mat.shape)  # v
-
-    return sys_mat, rhs, X_0D
- 
-
-def assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_0, exact_rhs_1, W_path):
-    # Space-time matrices for scalar unknowns
-    mass_mat = scipy.sparse.kron(time_fe.matrix["mass"], space_fe.matrix["mass"])
-    W_mass_mat = scipy.sparse.kron(time_fe.matrix["W_mass"], space_fe.matrix["mass"])
-    WW_mass_mat = scipy.sparse.kron(time_fe.matrix["WW_mass"], space_fe.matrix["mass"])
-    stiffness_mat = scipy.sparse.kron(
-        time_fe.matrix["mass"], space_fe.matrix["laplace"]
-    )
-    derivative_mat = scipy.sparse.kron(
-        time_fe.matrix["derivative"], space_fe.matrix["mass"]
-    )
-
-    # Space-time matrices for vectorial unknowns
-    A = scipy.sparse.block_array([[derivative_mat, None], [None, derivative_mat]]) 
-    A += scipy.sparse.block_array([[None, -mass_mat], [stiffness_mat, None]])
-    # the next term from the PWE
-    A += scipy.sparse.block_array([[W_mass_mat, None], [WW_mass_mat, W_mass_mat]])
-    
-    # Right hand side vector
-    xt_dofs = cart_prod_coords(time_fe.dofs, space_fe.dofs)
-    rhs0 = mass_mat.dot(exact_rhs_0(xt_dofs))
-    rhs1 = mass_mat.dot(exact_rhs_1(xt_dofs))
-    b = np.concatenate((rhs0, rhs1))
-
-    # Impose IC+BC
-    A, b, X0D = impose_IC_BC(A, b, space_fe, time_fe, boundary_data_u, boundary_data_v, X0)
-    
-    return A, b, X0D
-
-
-def ctg_wave(comm, boundary_D, V_x, 
-            start_time, end_time, t_slab_size, order_t,
-            boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v, W_t = None, verbose=False):
+    comm = numerics_params["comm"]
+    V_x = numerics_params["V_x"]
+    t_slab_size = numerics_params["t_slab_size"]
+    order_t = numerics_params["order_t"]
 
     time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
     space_fe = SpaceFE(V_x, boundary_D)
 
-    # Vector of dofs IC (over first slab)
 
     # I need time_fe object over 1st time slab to determine tx_coords
     slab = time_slabs[0]
     msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
-    V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
-    V_t_test = fem.functionspace(msh_t, ("DG", order_t))
-    time_fe = TimeFE(msh_t, V_t_trial, W_t)
-    
+    V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
+    time_fe = TimeFE(msh_t, V_t)
+
+    # Since W_t is determined, assing W-rependent matrices
+    time_fe.assemble_matrices_W(W_t)
+
     tx_coords = cart_prod_coords(time_fe.dofs, space_fe.dofs)  # shape (n_dofs_tx_scalar, 2) 
     u0 = initial_data_u(tx_coords)  # shape (n_dofs_tx_scalar, )
     v0 = initial_data_v(tx_coords)  # shape (n_dofs_tx_scalar, )
@@ -113,14 +59,17 @@ def ctg_wave(comm, boundary_D, V_x,
 
         # Assemble time FE curr slab
         msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
-        V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
-        time_fe = TimeFE(msh_t, V_t_trial, W_t)
+        V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
+        time_fe = TimeFE(msh_t, V_t)
 
         # Compute n dofs curr slab
         total_n_dofs_t += time_fe.n_dofs
 
+        # Compute W-dependent t operators curr slab
+        time_fe.assemble_matrices_W(W_t)
+
         # Assemble space-time linear system
-        sys_mat, rhs, X0D = assemble(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_0, exact_rhs_1, W_t)
+        sys_mat, rhs, X0D = assemble_ctg(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_0, exact_rhs_1, W_t)
 
         # Solve
         X = scipy.sparse.linalg.spsolve(sys_mat, rhs)        
@@ -141,4 +90,6 @@ def ctg_wave(comm, boundary_D, V_x,
         X0[dofs_ic_tx]=X[dofs_fc_tx]
     
     total_n_dofs = space_fe.n_dofs * total_n_dofs_t
+
+    # Return only the LAST time_fe
     return time_slabs, space_fe, sol_slabs, total_n_dofs, time_fe
