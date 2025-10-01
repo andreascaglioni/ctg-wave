@@ -53,7 +53,7 @@ class SpaceFE:
 
 class TimeFE:
     # use assemble_matrices_W(W_t) to assemble W_mass, WW_mass
-    def __init__(self, mesh, V):
+    def __init__(self, mesh, V, verbose=False):
         assert V.value_size == 1
         self.form = {}
         self.matrix = {}
@@ -62,6 +62,7 @@ class TimeFE:
         self.V = V
         self.dofs = self.V.tabulate_dof_coordinates()[:, 0 : gdim].reshape((-1, gdim))
         self.n_dofs = self.dofs.shape[0]
+        self.verbose = False
         # Compute *indicator functions* of IC and FC (final condition)
         self.dof_IC_vector = np.zeros(self.n_dofs)
         self.dof_IC_vector[np.argmin(self.dofs)] = 1.
@@ -74,17 +75,6 @@ class TimeFE:
         for dof, dof_t in zip(self.V.dofmap().dofs(), self.dofs):
             print(dof, ":", dof_t)
 
-    def assemble_matrices_0(self):
-        """Assemble matrices that are independent of the parameter y"""
-        u = ufl.TrialFunction(self.V)
-        phi = ufl.TestFunction(self.V)
-        # Mass
-        f = fem.form(ufl.inner(u, ufl.grad(phi)[0]) * ufl.dx)
-        self._add_form_matrix("mass", f)
-        # Derivative
-        f = fem.form((ufl.grad(u)[0] * ufl.grad(phi)[0]) * ufl.dx)
-        self._add_form_matrix("derivative", f)
-    
     def _add_form_matrix(self, name, form):
         """Add 1 form to instance and compute the matrix."""
         self.form[name] = form
@@ -93,9 +83,24 @@ class TimeFE:
         dl_mat_curr2 = dl_mat_curr.getValuesCSR()[::-1]
         self.matrix[name] = scipy.sparse.csr_matrix(dl_mat_curr2, shape=(self.n_dofs, self.n_dofs))
 
-    def assemble_matrices_W(self, W_t):
-        """Assemble all mantrices. W_t is a callable that takes an np.ndarray and returns an np.ndarray of the same shape."""
-        assert W_t is not None
+    def assemble_matrices_0(self):
+        """Assemble W-independent matrices."""
+        u = ufl.TrialFunction(self.V)
+        phi = ufl.TestFunction(self.V)
+        # Mass
+        f = fem.form(ufl.inner(u, ufl.grad(phi)[0]) * ufl.dx)
+        self._add_form_matrix("mass", f)
+        # Derivative
+        f = fem.form((ufl.grad(u)[0] * ufl.grad(phi)[0]) * ufl.dx)
+        self._add_form_matrix("derivative", f)
+
+
+    def assemble_matrices_W(self, W_t=None):
+        """Assemble all W-depndent mantrices. W_t is a callable."""
+        if W_t is None:
+            if self.verbose:
+                print("TimeFE Warning: W_t is None. Skiping assembly W_dependent operators.")
+            return
         u = ufl.TrialFunction(self.V)
         phi = ufl.TestFunction(self.V)
         W_fun = fem.Function(self.V)
@@ -115,18 +120,23 @@ class SpaceTimeFE:
 
     def __init__(self, 
                  space_fe: SpaceFE, 
-                 time_fe: 'TimeFE | None' = None):
+                 time_fe: 'TimeFE | None' = None,
+                 verbose: bool = False):
+        
         self.space_fe = space_fe
         self.time_fe = time_fe
+        self.verbose = verbose
         self.matrix = {}  # dictionary space time operators
         if type(time_fe) is TimeFE: 
             self.update_time_fe(time_fe)
         else:
             self.dofs = np.array([[]])
             self.n_dofs = 0
+            self.dofs_IC = np.array([])
+            self.dofs_FC = np.array([])
 
     def update_time_fe(self, time_fe: TimeFE):
-        """Update timeFE and X0 members. Use it moving to a new time slab."""
+        """Update time_fe and related members. Use it moving to a new time slab."""
         self.time_fe = time_fe
         self.dofs = cart_prod_coords(self.time_fe.dofs, self.space_fe.dofs)
         self.n_dofs = self.dofs.shape[0]
@@ -134,19 +144,21 @@ class SpaceTimeFE:
     
     def update_IC_FC_dofs(self):
         if self.time_fe is None:
-            print("Warning: self.time_fe is None. Cannot update IC/FC dofs.")
+            if self.verbose:
+                print("Warning: self.time_fe is None. Cannot update IC/FC dofs.")
             return
-        dofs_ic_t = self.time_fe.dof_IC_vector
-        dofs_fc_t = self.time_fe.dof_FC_vector
         n_dofs_x = self.space_fe.n_dofs
+        # IC DOFs
+        dofs_ic_t = self.time_fe.dof_IC_vector
         dofs_ic_tx_scalar = np.kron(dofs_ic_t, np.ones(n_dofs_x))
         self.dofs_IC = np.tile(dofs_ic_tx_scalar, 2).astype(bool)
+        # FC DOFs
+        dofs_fc_t = self.time_fe.dof_FC_vector
         dofs_fc_tx_scalar = np.kron(dofs_fc_t, np.ones(n_dofs_x))
         self.dofs_FC = np.tile(dofs_fc_tx_scalar, 2).astype(bool)
 
     def interpolate(self, f) -> np.ndarray | None:
-        """Compute dofs of interpolation of f into the space-time FEM space. """
-        # TODO works only for LAgrangian FEM! Impement projection
+        # TODO works only for LAgrangian FEM. Impement projection
         return f(self.dofs)
     
     def assemble(self, W_y):
@@ -157,7 +169,8 @@ class SpaceTimeFE:
     def assemble_noW(self):
         """Assemble opeartors independent of parameter y."""
         if self.time_fe is None:
-            print("Warning: self.time_fe is None. Assembly y-independent terms terminated.")
+            if self.verbose:
+                print("Warning: self.time_fe is None. Assembly y-independent terms terminated.")
             return
         M_t = self.time_fe.matrix["mass"]
         D_t = self.time_fe.matrix["derivative"]
@@ -167,11 +180,16 @@ class SpaceTimeFE:
         self.matrix["D_t"] = scipy.sparse.kron(D_t, M_x)
         self.matrix["M"] = scipy.sparse.kron(M_t, M_x)
 
-    def assemble_W(self, W_t):
+    def assemble_W(self, W_t=None):
         "Given a value of the coefficient W_t (function of time, usually a Brownina motion), assemble operators in which W_t appears."
         if self.time_fe is None:
-            print("Warning: self.time_fe is None. Assembly y-dependent terms terminated.")
+            if self.verbose:
+                print("Warning: self.time_fe is None. Assembly y-dependent terms terminated.")
             return
+        if W_t is None:
+            if self.verbose:
+                print("SpaceTimeFE Warning: W_T is None. Skip assembly W-dependent operators.")
+            return 
         self.time_fe.assemble_matrices_W(W_t)
         M_Wt = self.time_fe.matrix["W_mass"]
         M_W2t = self.time_fe.matrix["WW_mass"]

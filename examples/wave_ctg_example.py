@@ -1,23 +1,15 @@
-"""Implmenet CTG for 1st order formulation of the wave equation.
-Use separate variables for u and v instead of a 2d vectorial unknown.
-
-The wave equation reads: u_tt -  Δu = f
-and is equipped with initial and boundary conditions.
-"""
+"""Example of CTG approximation fo wave equation."""
 
 import numpy as np
+from math import ceil
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
-
+import csv
 import sys
-sys.path.insert(0, '.')
-from CTG.error import compute_err
-from CTG.utils import float_f, plot_error_tt, plot_uv_at_T, plot_uv_tt
+sys.path.insert(0, ".")
+from CTG.post_process import float_f, compute_energy_tt, plot_uv_tt
 from CTG.ctg_hyperbolic import ctg_wave
-import os
-
-
 
 
 if __name__ == "__main__":
@@ -30,45 +22,127 @@ if __name__ == "__main__":
     # PARAMETERS
     # space
     order_x = 1
-    n_cells_space = 40
+    n_cells_space = 100
     msh_x = mesh.create_unit_interval(comm, n_cells_space)
-    V_x = fem.functionspace(msh_x, ("Lagrange", 1, (1,)))  # 1d space
-    boundary_D = lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0))  # noqa: E731
-
-    # time
-    start_time = 0.0
-    end_time = 1.0
+    V_x = fem.functionspace(msh_x, ("Lagrange", order_x, (1,)))
+    
+    # Time
     t_slab_size = 0.01
     order_t = 1
-
-    # Exact sol
-    from data.exact_solution_wave_sep2 import (
-        exact_sol_u,
-        exact_sol_v,
+    start_time = 0.
+    end_time = 1.
+    
+    # Problem data
+    from data.data_wave_eq import (
         exact_rhs_0,
         exact_rhs_1,
         boundary_data_u,
         boundary_data_v,
         initial_data_u,
-        initial_data_v,
+        initial_data_v
     )
 
+    numerics_params = {
+        "comm": comm, 
+        "V_x": V_x,
+        "t_slab_size": t_slab_size,
+        "order_t": order_t
+    }
+    
+    physics_params = {
+        "boundary_D": lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0)),
+        "start_time": start_time,
+        "end_time": end_time,
+        "boundary_data_u": boundary_data_u,
+        "boundary_data_v": boundary_data_v,
+        "exact_rhs_0": exact_rhs_0,
+        "exact_rhs_1": exact_rhs_1,
+        "initial_data_u": initial_data_u,
+        "initial_data_v": initial_data_v
+    }
+    
     # error
     err_type_x = "h1"
-    err_type_t = "linf"
+    err_type_t = "l2"
 
+    
+    
     print("COMPUTE")
-    time_slabs, space_fe, sol_slabs = ctg_wave(comm, boundary_D, V_x, start_time, end_time, t_slab_size, order_t, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, initial_data_u, initial_data_v)
+    sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_wave(physics_params, numerics_params)
+    
+
     
     print("POST PROCESS")
-    # Compute error, total number of dofs
-    n_dofs, total_err, total_rel_err, err_slabs, norm_u_slabs = compute_err(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
-    print("Total error", float_f(total_err), "Total relative error", float_f(total_rel_err))
-    print("error over slabls", err_slabs)
+    # Compute post-processed quantities
+    # n_dofs, total_err, total_rel_err, err_slabs, norm_u_slabs = compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
+    # print("Total error", float_f(total_err), "Total relative error", float_f(total_rel_err))
+    # print("error over slabls", err_slabs)
 
-    # Plot
-    plot_error_tt(time_slabs, err_slabs, norm_u_slabs)
-    # plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u, exact_sol_v)
-    plot_uv_at_T(time_slabs, space_fe, sol_slabs, exact_sol_u, exact_sol_v)
+
+
+    space_fe = space_time_fe.space_fe
+    time_fe_last = space_time_fe.time_fe
+    n_x = space_fe.n_dofs
+    n_scalar=int(sol_slabs[0].size/2)
+
+    tt = np.linspace(start_time, end_time, ceil(1/t_slab_size))
+    EE, ppot, kkin = compute_energy_tt(space_fe, sol_slabs)
+    
+    u_final = sol_slabs[-1][n_scalar-n_x:n_scalar]
+    v_final = sol_slabs[-1][-n_x:]
+
+    # Print
+    print("Total energy (kinetic+potential):", EE)
+
+    # Export to CSV u_final, v_final
+    dofs = space_fe.dofs.flatten()
+    csv_filename_uv = "wave_uv_final.csv"
+    with open(csv_filename_uv, mode="w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["dof", "u_final", "v_final"])
+        for d, uf, vf in zip(dofs, u_final, v_final):
+            writer.writerow([d, uf, vf])
+    print(f"Exported DOFs, u_final, v_final to {csv_filename_uv}")
+
+    # Export to CSV tt, EE
+    csv_filename = "wave_energy.csv"
+    with open(csv_filename, mode="w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["tt", "EE"])
+        for t, e in zip(tt, EE):
+            writer.writerow([t, e])
+    print(f"Exported data to {csv_filename}")
+
+
+    # Plots
+    plt.figure()
+    plt.plot(tt, EE, '.-')
+    plt.title("Energy (kinetic + potential) of PWE sample")
+    plt.tight_layout()
+    plt.xlabel("t")
+    
+    # Plot u and v at final time
+    y_min = min(np.amin(u_final), np.amin(v_final))
+    y_max = max(np.amax(u_final), np.amax(v_final))
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+    # Left axis: u_final and UU_final
+    axs[0].plot(space_fe.dofs, u_final, "o-", label="u numerical")
+    axs[0].set_title(f"u at final time t={round(time_slabs[-1][1], 4)}")
+    axs[0].set_xlabel("x")
+    axs[0].legend()
+    axs[0].grid(True)
+    axs[0].set_ylim(y_min, y_max)
+    # Right axis: v_final and VV_final
+    axs[1].plot(space_fe.dofs, v_final, "s-", label="v numerical")
+    axs[1].set_title(f"v at final time t={round(time_slabs[-1][1], 4)}")
+    axs[1].set_xlabel("x")
+    axs[1].legend()
+    axs[1].grid(True)
+    axs[1].set_ylim(y_min, y_max)
+    plt.tight_layout()
+
+    plot_uv_tt(time_slabs, space_fe, sol_slabs)
 
     plt.show()
+
+    

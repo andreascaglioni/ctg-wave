@@ -17,7 +17,11 @@ class AssemblerWave:
         * Changing over time slabs: X0, time_fe
         * Changing over parameters: Ay, A"""
 
-    def __init__(self, space_time_fe: SpaceTimeFE | None = None):
+    def __init__(self, 
+                 space_time_fe: SpaceTimeFE | None = None,
+                 verbose : bool = False):
+        
+        self.verbose = verbose
         if space_time_fe is not None:
             self.update_space_time_fe(space_time_fe)
         else:
@@ -33,7 +37,8 @@ class AssemblerWave:
     def assemble_A0_b(self, exact_rhs_0, exact_rhs_1):
         """Assemble parameter-independent part of the linear system."""
         if self.space_time_fe is None:
-            print("Warning: self.space_time_fe is None. Assembly interrupted.")
+            if self.verbose:
+                print("Warning: self.space_time_fe is None. Assembly interrupted.")
             return None, None
         # Matrix
         L_mat = self.space_time_fe.matrix["L"]
@@ -48,11 +53,17 @@ class AssemblerWave:
         b_no_bc = np.concatenate((rhs0, rhs1))
         return A0_no_bc, b_no_bc
 
-    def assemble_A_W(self, W_t):
+    def assemble_A_W(self, W_t=None):
         """Assemble parameter-dependent part of the linear system."""
         if self.space_time_fe is None:
-            print("Warning: self.space_time_fe is None. Assembly interrupted.")
+            if self.verbose:
+                print("Warning: self.space_time_fe is None. Assembly interrupted.")
             return None
+        if W_t is None:
+            if self.verbose:
+                print("Assembler Warning: W_T is None. SKipping assemply W_depndent matrices.")
+            n = self.space_time_fe.n_dofs
+            return scipy.sparse.csr_matrix((2 * n, 2 * n))
         self.space_time_fe.assemble_W(W_t)
         M_W = self.space_time_fe.matrix["M_W"]
         M_W2 = self.space_time_fe.matrix["M_WW"]
@@ -62,21 +73,23 @@ class AssemblerWave:
                         W_t,
                         X0: np.ndarray,
                         exact_rhs_0,
-                        exact_rhs_1):
+                        exact_rhs_1,
+                        boundary_data_u, 
+                        boundary_data_v):
         
         # Assemble linear system operator
-        A_W_no_bc = self.assemble_A_W(W_t)
         A0_no_bc, b_no_bc = self.assemble_A0_b(exact_rhs_0, exact_rhs_1)
+        A_W_no_bc = self.assemble_A_W(W_t)
         # Check if assembly was successful
         if A_W_no_bc is None or A0_no_bc is None or b_no_bc is None:
             print("Warning: Assembly failed. Returning None.")
             return None, None, None
         A = A0_no_bc + A_W_no_bc
         # Get homogenous equation and initial-(Dirichlet) boundary condition X0D for lifting
-        A, b, X0D = self.impose_IC_BC(A, b_no_bc, X0)
+        A, b, X0D = self.impose_IC_BC(A, b_no_bc, X0, boundary_data_u, boundary_data_v)
         return A, b, X0D
 
-    def impose_IC_BC(self, sys_mat, rhs, X0):
+    def impose_IC_BC(self, sys_mat, rhs, X0, boundary_data_u, boundary_data_v):
         if self.space_time_fe is None or self.space_time_fe.time_fe is None:
             print("Warning: self.space_time_fe is None. Skipping impose_IC_BC.")
             return None, None, None
@@ -92,10 +105,10 @@ class AssemblerWave:
         bd_dofs_scalar = np.kron(np.ones((n_t, )), bd_dofs_x)
         # Compatibility dofs (where IC and BC are both imposed)
         compat_dofs_scalar = np.logical_and(ic_dofs_scalar == 1, bd_dofs_scalar == 1)
-        # Correspodning indicatiors for vectorial functions
+        compat_dofs = np.tile(compat_dofs_scalar, 2)
+        # Indicator IC or BC
         ic_bd_dofs_scalar = np.logical_or(ic_dofs_scalar, bd_dofs_scalar).astype(float)
         ic_bd_dofs = np.tile(ic_bd_dofs_scalar, 2)
-        compat_dofs = np.tile(compat_dofs_scalar, 2)
         # Boundary dofs (Dirichlet)
         X_D = np.concatenate((boundary_data_u(xt_dofs), boundary_data_v(xt_dofs)))
         # Combined lifting for IC and BC. NB Remove X0 on compatibility dofs to avoind double imposition.

@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0, "./")
 from CTG.FE_spaces import TimeFE
 from CTG.utils import cart_prod_coords
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def float_f(x):
@@ -76,31 +77,6 @@ def plot_basis_functions(msh_x, V_x):
         export_xdmf(msh_x, bf, filename=f"bf{i}.xdmf")
 
 
-def plot_uv_at_T(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=None):
-    n_x = space_fe.n_dofs
-    assert sol_slabs[0].size % 2 == 0, "sol_slabs[0].size must be even, got {}".format(sol_slabs[0].size)
-    n_dofs_scalar = int(sol_slabs[0].size / 2)
-
-    X_final = sol_slabs[-1]
-    tx_final = cart_prod_coords(np.array([time_slabs[-1][1]]), space_fe.dofs)
-
-    u = X_final[n_dofs_scalar-n_x:n_dofs_scalar]
-    v = X_final[-n_x:]
-
-    plt.figure()
-    plt.plot(space_fe.dofs, u, "o-", label="u numerical")
-    if exact_sol_u is not None:
-        plt.plot(space_fe.dofs, exact_sol_u(tx_final), "--", label="u exact")
-    plt.plot(space_fe.dofs, v, "s-", label="v numerical")
-    if exact_sol_v is not None:
-        plt.plot(space_fe.dofs, exact_sol_v(tx_final), ":", label="v exact")
-    plt.title(f"u and v at final time t={round(time_slabs[-1][1], 4)}")
-    plt.legend()
-    plt.tight_layout()
-    
-    return u, v
-
-
 def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=None):
     n_x = space_fe.n_dofs
     assert sol_slabs[0].size % 2 == 0, "sol_slabs[0].size must be even, got {}".format(sol_slabs[0].size)
@@ -113,7 +89,6 @@ def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=No
     vv = np.array([X[n_dofs_scalar:] for X in sol_slabs])
     vmin = np.amin(vv)
     vmax = np.amax(vv)
-
 
     plt.figure(figsize=(10, 4))
     for i, slab in enumerate(time_slabs):
@@ -140,7 +115,8 @@ def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=No
         ax2.legend()
         ax2.set_ylim((vmin, vmax))
         plt.tight_layout()
-        plt.pause(0.05)
+        
+        plt.pause(0.1)
 
 
 def plot_error_tt(time_slabs, err_slabs, norm_u_slabs):
@@ -181,3 +157,21 @@ def compute_energy_tt(space_fe, sol_slabs):
         eenergy[i] = ppot[i] + kkin[i]
         
     return eenergy, ppot, kkin
+
+
+
+
+def plot_on_slab(dofs_x, dofs_t, X):
+    A, B = np.meshgrid(dofs_t, dofs_x, indexing='ij')
+    A_flat = A.flatten()
+    B_flat = B.flatten()
+    C_flat = X.flatten()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot_trisurf(A_flat, B_flat, C_flat, cmap='viridis', edgecolor='none')
+    ax.set_xlabel('Time (a)')
+    ax.set_ylabel('Space (b)')
+    ax.set_zlabel('Value (c)')
+    plt.tight_layout()
+    plt.show()

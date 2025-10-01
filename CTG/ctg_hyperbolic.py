@@ -8,6 +8,8 @@ sys.path.append("./")
 from CTG.FE_spaces import TimeFE, SpaceFE, SpaceTimeFE
 from CTG.Assembler import AssemblerWave
 from CTG.utils import compute_time_slabs
+from CTG.FE_spaces import SpaceTimeFE
+from CTG.post_process import plot_on_slab
 
 
 def ctg_wave(physics_params, numerics_params, verbose=False):
@@ -32,10 +34,6 @@ def ctg_wave(physics_params, numerics_params, verbose=False):
     t_slab_size = numerics_params["t_slab_size"]
     order_t = numerics_params["order_t"]
 
-
-
-
-
     time_slabs = compute_time_slabs(start_time, end_time, t_slab_size)
     space_fe = SpaceFE(V_x, boundary_D)
 
@@ -44,21 +42,12 @@ def ctg_wave(physics_params, numerics_params, verbose=False):
     msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
     V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
     time_fe = TimeFE(msh_t, V_t)
-
-    # Since W_t is determined, assing W-rependent matrices
-    time_fe.assemble_matrices_W(W_t)
-
-    from CTG.FE_spaces import SpaceTimeFE
+    
+    # Get coordinates initial condition
     space_time_fe = SpaceTimeFE(space_fe, time_fe)
     U0 = space_time_fe.interpolate(initial_data_u)  # DOFs vector
     V0 = space_time_fe.interpolate(initial_data_v)
     X0 = np.concatenate((U0, V0))
-    
-
-    # tx_coords = cart_prod_coords(time_fe.dofs, space_fe.dofs)  # shape (n_dofs_tx_scalar, 2) 
-    # u0 = space_fe.project(initial_data_u)  # initial_data_u(tx_coords)  # shape (n_dofs_tx_scalar, )
-    # v0 = initial_data_v(tx_coords)  # shape (n_dofs_tx_scalar, )
-    # X0 = np.concatenate((u0, v0))  # shape (2*n_dofs_tx_scalar, )
     
     # time stepping
     sol_slabs = []
@@ -78,7 +67,7 @@ def ctg_wave(physics_params, numerics_params, verbose=False):
         space_time_fe.assemble(W_t)
 
         assembler = AssemblerWave(space_time_fe)
-        sys_mat, rhs, X0D = assembler.assemble_system(W_t, X0, exact_rhs_0, exact_rhs_1)
+        sys_mat, rhs, X0D = assembler.assemble_system(W_t, X0, exact_rhs_0, exact_rhs_1,boundary_data_u, boundary_data_v)
 
         if sys_mat is None:
             raise RuntimeError("System matrix is None. Aborting computation.")
@@ -91,11 +80,14 @@ def ctg_wave(physics_params, numerics_params, verbose=False):
         
         # Restore IC and BC
         X = X + X0D
+
+        # plot_on_slab(space_fe.dofs, time_fe.dofs, X)
+        
         sol_slabs.append(X)
 
         # Final condition (FC) becomes the IC on the next slab
         X0 = np.zeros_like(X0)
-        X0[space_time_fe.dofs_IC]=X[space_time_fe.dofs_IC]
+        X0[space_time_fe.dofs_IC]=X[space_time_fe.dofs_FC]
     
     # Return only the LAST space_time_fe
     return sol_slabs, time_slabs, space_time_fe, total_n_dofs
