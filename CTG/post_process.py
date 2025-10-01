@@ -2,8 +2,10 @@ from math import sqrt
 import matplotlib.pyplot as plt
 import numpy as np
 from dolfinx import fem, io, mesh
+import sys
+sys.path.insert(0, "./")
 from CTG.FE_spaces import TimeFE
-from CTG.utils import cart_prod_coords, compute_error_slab
+from CTG.utils import cart_prod_coords
 
 
 def float_f(x):
@@ -179,32 +181,3 @@ def compute_energy_tt(space_fe, sol_slabs):
         eenergy[i] = ppot[i] + kkin[i]
         
     return eenergy, ppot, kkin
-
-
-def compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u):
-    err_slabs = -1.0 * np.ones(len(time_slabs))
-    norm_u_slabs = -1.0 * np.ones_like(err_slabs)
-    total_n_dofs_t = 0
-    for i, slab in enumerate(time_slabs):
-        msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
-        V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
-        time_fe = TimeFE(msh_t, V_t_trial)
-        total_n_dofs_t += time_fe.n_dofs
-        X = sol_slabs[i]
-        u = X[:int(X.size/2)]
-
-        err_slabs[i], norm_u_slabs[i] = compute_error_slab(u, exact_sol_u, space_fe, time_fe, err_type_x, err_type_t)
-
-    total_n_dofs = space_fe.n_dofs * total_n_dofs_t
-
-    if err_type_t == "linf":
-        total_err = np.amax(err_slabs)
-        total_norm_u = np.amax(norm_u_slabs)
-    elif err_type_t == "l2":
-        ddt = np.array([ts[1]-ts[0] for ts in time_slabs])
-        total_err = sqrt(np.dot(ddt, np.square(err_slabs)))
-        total_norm_u = sqrt(np.dot(ddt, np.square(norm_u_slabs)))
-    else:
-        raise ValueError(f"Unknown error type in time: {err_type_t}")
-    total_rel_err = total_err / total_norm_u
-    return total_err, total_rel_err, total_n_dofs, err_slabs, norm_u_slabs

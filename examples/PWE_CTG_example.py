@@ -38,17 +38,17 @@ if __name__ == "__main__":
     # PARAMETERS
     # space
     order_x = 1
-    n_cells_space = 40
+    n_cells_space = 100
     msh_x = mesh.create_unit_interval(comm, n_cells_space)
     V_x = fem.functionspace(msh_x, ("Lagrange", order_x, (1,)))
     
     # Time
-    t_slab_size = 0.1
+    t_slab_size = 0.01
     order_t = 1
     start_time = 0.
     end_time = 1.
     y = 1*np.random.standard_normal(100)
-    W_t = lambda tt: 1.*param_LC_W(y, tt, T=end_time)[0]
+    W_t = lambda tt: 0.*param_LC_W(y, tt, T=end_time)[0]
     
     # Problem data 
     from data.data_param_wave_eq import (
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     
     
     print("COMPUTE")
-    time_slabs, space_fe, sol_slabs, total_n_dofs, time_fe_last = ctg_wave(physics_params, numerics_params)
+    sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_wave(physics_params, numerics_params)
     
 
     
@@ -96,6 +96,9 @@ if __name__ == "__main__":
     # n_dofs, total_err, total_rel_err, err_slabs, norm_u_slabs = compute_err_ndofs(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, exact_sol_u)    
     # print("Total error", float_f(total_err), "Total relative error", float_f(total_rel_err))
     # print("error over slabls", err_slabs)
+
+    space_fe = space_time_fe.space_fe
+    time_fe_last = space_time_fe.time_fe
     tt = np.linspace(start_time, end_time, ceil(1/t_slab_size))
     WW = physics_params["W_t"](tt)
     EE, ppot, kkin = compute_energy_tt(space_fe, sol_slabs)

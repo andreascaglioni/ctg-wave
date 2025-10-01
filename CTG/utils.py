@@ -1,113 +1,63 @@
 """Functions for the Continuous Time Galerkin method for the space-time integration
 of space-time problems, such as paraboic and hyperbolic PDEs."""
 
-from math import sqrt, ceil, log, sqrt, pi
-from math import sqrt, sqrt
-from dolfinx import fem, mesh
 import numpy as np
-import scipy.sparse
-from scipy.interpolate import griddata
 import sys
 sys.path.append("./")
-from CTG.FE_spaces import SpaceFE, TimeFE
-import copy
 
 
 def cart_prod_coords(t_coords, x_coords):
+    """
+    Computes cartesian product of two coordinate arrays.
+    Args:
+        t_coords (np.ndarray): Column 2D array of time coordinates.
+        x_coords (np.ndarray): Column 2D array of spatial coordinates.
+    Returns:
+        np.ndarray: 2D array where each row is a pair (t, x) from the cartesian product of t_coords and x_coords.
+    """
+
     if len(x_coords.shape) == 1:  # coordinates i wrong format (rank 1 array). assume 1d.
         x_coords = np.expand_dims(x_coords, 1)
     if len(t_coords.shape) == 1:  # t coords in wron format assume 1d
         t_coords = np.expand_dims(t_coords, 1)
-        
     long_t_coords = np.kron(t_coords, np.ones((x_coords.shape[0], 1)))
     long_x_coords = np.kron(np.ones((t_coords.shape[0], 1)), x_coords)
     return np.hstack((long_t_coords, long_x_coords))
 
 
 def compute_time_slabs(start_time, end_time, slab_size):
+    """
+    Divides a time interval into consecutive slabs of a given size.
+    Args:
+        start_time (float): The starting time of the interval.
+        end_time (float): The ending time of the interval.
+        slab_size (float): The size of each time slab.
+    Returns:
+        list of tuple: List of (start, end) tuples for each time slab.
+    """
+
     time_slabs = [(start_time, start_time + slab_size)]  # current time interval
     while time_slabs[-1][1] < end_time - 1e-10:
         time_slabs.append((time_slabs[-1][1], time_slabs[-1][1] + slab_size))
     return time_slabs
 
-
-def compute_error_slab(sol_slab, exact_sol, space_fe, time_fe, err_type_x, err_type_t):
-    # refine Time
-    msh_t = time_fe.mesh
-    msh_t_ref = mesh.refine(msh_t)[0]
-    p_t_trial = time_fe.V_trial.element.basix_element.degree
-    V_t_trial_ref = fem.functionspace(msh_t_ref, ("Lagrange", p_t_trial))
-    p_t_test = time_fe.V_test.element.basix_element.degree
-    V_t_test_ref = fem.functionspace(msh_t_ref, ("DG", p_t_test))
-    time_fe_ref = TimeFE(msh_t_ref, V_t_trial_ref, V_t_test_ref)
-
-    # refine Space
-    msh_x = space_fe.mesh
-    msh_x_ref = mesh.refine(msh_x)[0]
-    p_Space = space_fe.V.element.basix_element.degree
-    V_x_ref = fem.functionspace(msh_x_ref, ("Lagrange", p_Space))
-    space_fe_ref = SpaceFE(V_x_ref)
-
-    # Interpolate exact sol in fine space # TODO works only for Lagrangian FE
-    fine_coords = cart_prod_coords(time_fe_ref.dofs, space_fe_ref.dofs)
-    ex_sol_ref = exact_sol(fine_coords)
-
-    # Interpolate numerical sol using griddata (linear interpolation)
-    # TODO works only for Lagrangian FE
-    coarse_coords = cart_prod_coords(time_fe.dofs_trial, space_fe.dofs)
-    sol_slab_ref = griddata(
-        coarse_coords, sol_slab, fine_coords, method="linear", fill_value=0.0
-    )
-
-    # Adapt to error type
-    if err_type_x == "h1":
-        ip_space_ref = space_fe_ref.matrix["mass"] + space_fe_ref.matrix["laplace"]
-    elif err_type_x == "l2":
-        ip_space_ref = space_fe_ref.matrix["mass"]
-    else:
-        raise ValueError(f"Unknown error type x: {err_type_x}")
-
-    err_fun_ref = ex_sol_ref - sol_slab_ref
-
-    if err_type_t == "l2":
-        ip_tx = scipy.sparse.kron(time_fe_ref.matrix["mass"], ip_space_ref)
-        err = sqrt(ip_tx.dot(err_fun_ref).dot(err_fun_ref))
-        norm_u = sqrt(ip_tx.dot(ex_sol_ref).dot(ex_sol_ref))
-    elif err_type_t == "linf":
-        err = -1.0
-        norm_u = -1.0
-        for i, t in enumerate(time_fe.dofs_trial):
-            coords_u_t = ex_sol_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
-            norm_u_t = sqrt(ip_space_ref.dot(coords_u_t).dot(coords_u_t))
-            norm_u = max(norm_u, norm_u_t)
-
-            coords_err_t = err_fun_ref[i * space_fe_ref.n_dofs : (i + 1) * space_fe_ref.n_dofs]
-            err_t = sqrt(ip_space_ref.dot(coords_err_t).dot(coords_err_t))
-            err = max(err, err_t)
-    else:
-        raise ValueError(f"Unknown error type t: {err_type_t}")
-    return err, norm_u
-
-
-def inverse_DS_transform(xx, WW_fun, space_fe, time_fe):
-    """ Apply the inverse Doss-Sussmann transform to obtain a sample solution of the Stochastic Wave Equation (SWE) 
-    from a sample solution of the Random Wave Equation (RWE), or equivalently, a solution of the Parametric Wave Equation (PWE) 
-    evaluated for a random standard Gaussian vector.
+def inverse_DS_transform(XX, WW_fun, space_fe, time_fe):
+    """Apply the inverse Doss-Sussmann transform to a sample solution of the parametric Andreson model (a parametric wave equation) to obtain a sample solution of the stochastic Anderson model (a stochastic wave equation). 
 
     Args:
         xx (np.ndarray): Coordinates (in space time FE basis) of a sample solution of the RWE (or PWE evaluated at a random standard Gaussian vector) over 1 space-time slab. First havlf is u, second is v = partial_t u. For both u and v, coords are 1st wrt time basis, then space basis (using tensor prodcut space time FEM basis).
-        WW (np.array): Samples of Brownian motion corresonding to xx at discrete times tt (same as space time basis).
+        WW_fun (Callable[[np.ndarray], np.ndarray]): A callable that takes an array of times and returns the values of a (LC-expansion of the) Brownian motion at those times.
         space_fe(SpaceFE): Class for space finite elements.
-        time_fe(TimeFE): Class for time finite elements. It must correspond to the same time slab as xx.
+        time_fe(TimeFE): Class for time finite elements corresponding to the same time slab as xx.
 
     Returns:
         np.ndarray: Sample solution of the SWE obtained via the inverse Doss-Sussmann transform.
     """
 
-    n_scalar = int(xx.size/2)
+    n_scalar = int(XX.size/2)
     n_x = space_fe.n_dofs
-    uu = xx[:n_scalar]
-    vv = xx[n_scalar:]
+    uu = XX[:n_scalar]
+    vv = XX[n_scalar:]
     WW = WW_fun(time_fe.dofs)
     WW_rep = np.repeat(WW, n_x)
     return np.concatenate((uu, vv + WW_rep*uu))
