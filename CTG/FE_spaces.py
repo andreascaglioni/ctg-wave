@@ -90,6 +90,9 @@ class TimeFE:
         # Mass
         f = fem.form(ufl.inner(u, ufl.grad(phi)[0]) * ufl.dx)
         self._add_form_matrix("mass", f)
+        # Classical mass matrix with same test and trial spaces
+        f = fem.form(ufl.inner(u, phi) * ufl.dx)
+        self._add_form_matrix("mass_err", f)
         # Derivative
         f = fem.form((ufl.grad(u)[0] * ufl.grad(phi)[0]) * ufl.dx)
         self._add_form_matrix("derivative", f)
