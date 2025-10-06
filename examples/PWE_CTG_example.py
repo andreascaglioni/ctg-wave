@@ -85,13 +85,9 @@ if __name__ == "__main__":
     err_type_x = "h1"
     err_type_t = "l2"
 
-    
-    
     print("COMPUTE")
     ctg_solver = CTGSolver(numerics_params, verbose=False)
     sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(physics_params)
-    
-
     
     print("POST PROCESS")
     # Compute post-processed quantities
