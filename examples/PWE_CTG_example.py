@@ -23,15 +23,16 @@ import csv
 import sys
 sys.path.insert(0, ".")
 from CTG.brownian_motion import param_LC_W
-from CTG.post_process import float_f, compute_energy_tt, plot_uv_at_T, plot_uv_tt
-from CTG.ctg_hyperbolic import ctg_wave
+from CTG.post_process import float_f, compute_energy_tt, plot_uv_tt
+from CTG.ctg_solver import CTGSolver
 from CTG.utils import inverse_DS_transform
+from mpl_toolkits.mplot3d import Axes3D
 
 
 if __name__ == "__main__":
     # SETTINGS
-    seed = 0
-    np.random.seed(0)
+    seed = 1
+    np.random.seed(seed)
     comm = MPI.COMM_SELF
     np.set_printoptions(formatter={"float_kind": float_f})
 
@@ -47,10 +48,10 @@ if __name__ == "__main__":
     order_t = 1
     start_time = 0.
     end_time = 1.
-    y = 1*np.random.standard_normal(100)
-    W_t = lambda tt: 0.*param_LC_W(y, tt, T=end_time)[0]
+    y = np.random.standard_normal(100)
+    W_t = lambda tt: param_LC_W(y, tt, T=end_time)[0]
     
-    # Problem data 
+    # Problem data
     from data.data_param_wave_eq import (
         exact_rhs_0,
         exact_rhs_1,
@@ -82,12 +83,13 @@ if __name__ == "__main__":
     
     # error
     err_type_x = "h1"
-    err_type_t = "linf"
+    err_type_t = "l2"
 
     
     
     print("COMPUTE")
-    sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_wave(physics_params, numerics_params)
+    ctg_solver = CTGSolver(numerics_params, verbose=False)
+    sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(physics_params)
     
 
     
@@ -98,12 +100,13 @@ if __name__ == "__main__":
     # print("error over slabls", err_slabs)
 
     space_fe = space_time_fe.space_fe
+    n_x = space_fe.n_dofs
     time_fe_last = space_time_fe.time_fe
+    n_scalar=int(sol_slabs[0].size/2)
     tt = np.linspace(start_time, end_time, ceil(1/t_slab_size))
     WW = physics_params["W_t"](tt)
     EE, ppot, kkin = compute_energy_tt(space_fe, sol_slabs)
-    n_x = space_fe.n_dofs
-    n_scalar=int(sol_slabs[0].size/2)
+    
     u_final = sol_slabs[-1][n_scalar-n_x:n_scalar]
     v_final = sol_slabs[-1][-n_x:]
     XX = inverse_DS_transform(sol_slabs[-1], physics_params["W_t"], space_fe, time_fe_last)
@@ -112,6 +115,25 @@ if __name__ == "__main__":
 
     # Print
     print("Total energy (kinetic+potential):", EE)
+
+    # Export to CSV u_final, v_final
+    dofs = space_fe.dofs.flatten()
+    csv_filename_uv = "wave_uv_final.csv"
+    with open(csv_filename_uv, mode="w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["dof", "u_final", "v_final"])
+        for d, uf, vf in zip(dofs, u_final, v_final):
+            writer.writerow([d, uf, vf])
+    print(f"Exported DOFs, u_final, v_final to {csv_filename_uv}")
+
+    # Export to CSV WW, EE
+    csv_filename = "WW_wave_energy.csv"
+    with open(csv_filename, mode="w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["tt", "WW", "EE"])
+        for t, w, e in zip(tt, WW, EE):
+            writer.writerow([t, w, e])
+    print(f"Exported data to {csv_filename}")
 
     # Plots
     plt.figure()
@@ -125,44 +147,46 @@ if __name__ == "__main__":
     plt.title("Energy (kinetic + potential) of PWE sample")
     plt.tight_layout()
     plt.xlabel("t")
-    
-    # plot_uv_tt(time_slabs, space_fe, sol_slabs)
 
+    # Plot u, v and solution original SDE at final time 
+    y_min, y_max = np.amin(sol_slabs[-1]), np.amax(sol_slabs[-1])
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-    # Left axis: u_final and UU_final
-    axs[0].plot(space_fe.dofs, u_final, "o-", label="u numerical")
-    axs[0].plot(space_fe.dofs, UU_final, ".-", label="u (DS transform)")
+    axs[0].plot(space_fe.dofs, u_final, ".-", label="u numerical")
+    axs[0].plot(space_fe.dofs, UU_final, ".-", label="u (DS inv. transform)")
     axs[0].set_title(f"u at final time t={round(time_slabs[-1][1], 4)}")
     axs[0].set_xlabel("x")
     axs[0].legend()
-    axs[0].grid(True)
-    # Right axis: v_final and VV_final
-    axs[1].plot(space_fe.dofs, v_final, "s-", label="v numerical")
-    axs[1].plot(space_fe.dofs, VV_final, ".-", label="v (DS transform)")
+    axs[1].plot(space_fe.dofs, v_final, ".-", label="v numerical")
+    axs[1].plot(space_fe.dofs, VV_final, ".-", label="v (DS inv. transform)")
     axs[1].set_title(f"v at final time t={round(time_slabs[-1][1], 4)}")
     axs[1].set_xlabel("x")
     axs[1].legend()
-    axs[1].grid(True)
     plt.tight_layout()
+    ymin = min(axs[0].get_ylim()[0], axs[1].get_ylim()[0])
+    ymax = max(axs[0].get_ylim()[1], axs[1].get_ylim()[1])
+    axs[0].set_ylim(ymin, ymax)
+    axs[1].set_ylim(ymin, ymax)
 
-    # Export to CSV u_final, v_final
-    dofs = space_fe.dofs.flatten()
-    csv_filename_uv = "wave_uv_final.csv"
-    with open(csv_filename_uv, mode="w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["dof", "u_final", "v_final"])
-        for dof, u_final, v_final in zip(dofs, u_final, v_final):
-            writer.writerow([dof, u_final, v_final])
-    print(f"Exported DOFs, u_final, v_final to {csv_filename_uv}")
+    # Plot u(t,x0) for fixed x0, as function of t
+    n_dof_track = int(space_fe.n_dofs/4)
+    plt.figure()
+    u_t = np.array([sol_slab[n_dof_track] for sol_slab in sol_slabs])
+    plt.plot(tt, u_t, '.-')
+    plt.title("u(t, x0) for x0 = "+str(space_fe.dofs[n_dof_track]))
+    plt.tight_layout()
+    plt.xlabel("t")
 
-    # Export to CSV WW, EE
-    csv_filename = "wave_energy.csv"
-    with open(csv_filename, mode="w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["tt", "WW", "EE"])
-        for t, w, e in zip(tt, WW, EE):
-            writer.writerow([t, w, e])
-    print(f"Exported data to {csv_filename}")
+    # plot_uv_tt(time_slabs, space_fe, sol_slabs)
+
+    # 3d plot space-time
+    plt.figure()
+    X, Y = np.meshgrid(space_fe.dofs, tt)
+    U = np.array([sol_slab[:space_fe.n_dofs] for sol_slab in sol_slabs])
+    ax = plt.axes(projection='3d')
+    ax.plot_surface(X, Y, U, cmap='viridis')
+    ax.set_xlabel('x')
+    ax.set_ylabel('t')
+    ax.set_title('Space-time solution u surface')
 
     plt.show()
 
