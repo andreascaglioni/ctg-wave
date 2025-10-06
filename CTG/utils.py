@@ -61,3 +61,16 @@ def inverse_DS_transform(XX, WW_fun, space_fe, time_fe):
     WW = WW_fun(time_fe.dofs)
     WW_rep = np.repeat(WW, n_x)
     return np.concatenate((uu, vv + WW_rep*uu))
+
+def vprint(str, verbose = True):
+    """
+    Prints the given string if verbose is True.
+    Args:
+        str (str): The string to print.
+        verbose (bool, optional): If True, prints the string. Defaults to True.
+    Returns:
+        None
+    """
+
+    if verbose:
+        print(str)
