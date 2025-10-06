@@ -2,7 +2,7 @@
 
 from mpi4py import MPI
 from dolfinx.mesh import create_unit_square
-from dolfinx.io import XDMFFile
+from dolfinx import io
 import numpy as np
 
 
@@ -11,6 +11,6 @@ for n in nn:
     print("n elements per edge:", n)
     filename = "msh_square_dolfinx/mesh_square_" + str(int(n)) + ".xdmf"
     msh = create_unit_square(MPI.COMM_SELF, n, n)
-    xdmf = XDMFFile(msh.comm, filename, "w")
+    xdmf = io.XDMFFile(msh.comm, filename, "w")
     xdmf.write_mesh(msh)
     xdmf.close()
