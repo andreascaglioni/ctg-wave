@@ -5,3 +5,4 @@ results/
 .vscode/
 test_script.py
 *.csv
+CTG_parabolic/
