@@ -15,8 +15,7 @@ from CTG.brownian_motion import param_LC_W
 from CTG.ctg_solver import CTGSolver
 from CTG.error import compute_err
 from CTG.post_process import float_f
-from CTG.post_process import compute_rate
-
+from CTG.post_process import compute_rate, compute_energy_tt
 
 if __name__ == "__main__":
     # SETTINGS
@@ -80,6 +79,7 @@ if __name__ == "__main__":
     print("CONVERNGENCE TEST")
     err = np.zeros_like(ddt)
     nn_dofs = np.zeros(ddt.size, dtype=int)
+    EE = []
     for i, dt in enumerate(ddt):
         print("\nDT = ", dt)
         numerics_params["t_slab_size"] = ddt[i]
@@ -97,6 +97,9 @@ if __name__ == "__main__":
         err[i] = err_u + err_v
         print("Total error", float_f(err[i]) )
 
+        E, _, _ = compute_energy_tt(space_time_fe.space_fe, sol_slabs)
+        EE.append(E)
+
     print("CONVERGENCE SUMMARY:")
     print("ddt", ddt)
     print("nn_dofs", nn_dofs)
@@ -112,4 +115,13 @@ if __name__ == "__main__":
     plt.xlabel("dt")
     plt.title("Convergence energy norm error CTG")
     plt.legend()
+
+    plt.figure()
+    for i, dt in enumerate(ddt):
+        tt = np.linspace(start_time, end_time, int(1/dt))
+        plt.plot(tt, EE[i], 'o-', linewidth=2, label="dt = "+str(dt))
+    plt.legend()
+    plt.ylim(np.min([np.min(E) for E in EE]), np.max([np.max(E) for E in EE]))
+    plt.xlabel("Time")
+    plt.title("Total energy (kinetic + potential) for different dt")
     plt.show()
