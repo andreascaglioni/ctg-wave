@@ -6,3 +6,4 @@ results/
 test_script.py
 *.csv
 CTG_parabolic/
+delete/
