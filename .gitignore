@@ -3,8 +3,7 @@ __pycache__/
 */__pycache__/
 results/
 .vscode/
-test_script.py
-*.csv
 CTG_parabolic/
 delete/
-CTG_parabolic/
+test_script.py
+*.csv

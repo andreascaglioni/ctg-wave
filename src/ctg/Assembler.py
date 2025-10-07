@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 import sys
 sys.path.insert(0, "./")
-from CTG.FE_spaces import SpaceTimeFE
+from ctg.FE_spaces import SpaceTimeFE
 from data.data_param_wave_eq import boundary_data_u, boundary_data_v
 
 

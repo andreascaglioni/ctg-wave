@@ -3,7 +3,6 @@ of space-time problems, such as paraboic and hyperbolic PDEs."""
 
 import numpy as np
 import sys
-sys.path.append("./")
 
 
 def cart_prod_coords(t_coords, x_coords):

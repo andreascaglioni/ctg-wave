@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from dolfinx import fem, io, mesh
 import sys
-sys.path.insert(0, "./")
-from CTG.FE_spaces import TimeFE
-from CTG.utils import cart_prod_coords
 from mpl_toolkits.mplot3d import Axes3D
+
+from ctg.FE_spaces import TimeFE
+from ctg.utils import cart_prod_coords
 
 
 def float_f(x):

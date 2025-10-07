@@ -5,11 +5,11 @@ from dolfinx import fem, mesh
 import warnings
 
 sys.path.append("./")
-from CTG.FE_spaces import TimeFE, SpaceFE, SpaceTimeFE
-from CTG.Assembler import AssemblerWave
-from CTG.utils import compute_time_slabs, vprint
-from CTG.FE_spaces import SpaceTimeFE
-from CTG.post_process import plot_on_slab
+from ctg.FE_spaces import TimeFE, SpaceFE, SpaceTimeFE
+from ctg.Assembler import AssemblerWave
+from ctg.utils import compute_time_slabs, vprint
+from ctg.FE_spaces import SpaceTimeFE
+from ctg.post_process import plot_on_slab
 
 
 class CTGSolver():

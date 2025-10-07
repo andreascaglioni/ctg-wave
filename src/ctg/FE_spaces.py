@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse
 import ufl
 
-from CTG.utils import cart_prod_coords
+from ctg.utils import cart_prod_coords
 
 
 class SpaceFE:

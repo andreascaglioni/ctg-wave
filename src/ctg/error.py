@@ -1,6 +1,6 @@
 import numpy as np
-from CTG.FE_spaces import SpaceFE, TimeFE, SpaceTimeFE
-from CTG.utils import cart_prod_coords
+from ctg.FE_spaces import SpaceFE, TimeFE, SpaceTimeFE
+from ctg.utils import cart_prod_coords
 
 
 import scipy.sparse
