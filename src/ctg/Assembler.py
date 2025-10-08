@@ -18,16 +18,12 @@ class AssemblerWave:
         * Changing over parameters: Ay, A"""
 
     def __init__(self, 
-                 space_time_fe: SpaceTimeFE | None = None,
+                 space_time_fe: SpaceTimeFE,
                  verbose : bool = False):
         
         self.verbose = verbose
-        if space_time_fe is not None:
-            self.update_space_time_fe(space_time_fe)
-        else:
-            self.space_time_fe = None
-            self.A0_no_bc = None
-            self.b_no_bc = None
+        self.update_space_time_fe(space_time_fe)
+
 
     def update_space_time_fe(self,
                              space_time_fe: SpaceTimeFE):
@@ -82,7 +78,7 @@ class AssemblerWave:
         A_W_no_bc = self.assemble_A_W(W_t)
         # Check if assembly was successful
         if A_W_no_bc is None or A0_no_bc is None or b_no_bc is None:
-            print("Warning: Assembly failed. Returning None.")
+            print("Warning: Assembly failed because None matrix or vector. Returning None.")
             return None, None, None
         A = A0_no_bc + A_W_no_bc
         # Get homogenous equation and initial-(Dirichlet) boundary condition X0D for lifting
@@ -93,12 +89,12 @@ class AssemblerWave:
         if self.space_time_fe is None or self.space_time_fe.time_fe is None:
             print("Warning: self.space_time_fe is None. Skipping impose_IC_BC.")
             return None, None, None
-
+        # Extract vars
         xt_dofs = self.space_time_fe.dofs
         n_dofs_scalar = int(sys_mat.shape[1]/2)
         n_x = self.space_time_fe.space_fe.n_dofs
         n_t = self.space_time_fe.time_fe.n_dofs
-        # Indicator dofs IC nad boundary condition (BC) in space-time
+        # Indicator dofs for either IC or BC in space-time
         ic_dofs_t = self.space_time_fe.time_fe.dof_IC_vector
         ic_dofs_scalar = np.kron(ic_dofs_t, np.ones((n_x, )))
         bd_dofs_x = self.space_time_fe.space_fe.boundary_dof_vector
@@ -120,34 +116,3 @@ class AssemblerWave:
         sys_mat += scipy.sparse.diags(ic_bd_dofs, offsets=0, shape=sys_mat.shape)  # u
         sys_mat += scipy.sparse.diags(ic_bd_dofs, offsets=n_dofs_scalar, shape=sys_mat.shape)  # v
         return sys_mat, rhs, X_0D
-    
-
-
-# Legacy code
-    # def assemble_ctg(space_fe, time_fe, boundary_data_u, boundary_data_v, X0, exact_rhs_0, exact_rhs_1, W_path):
-    #     # Space-time matrices for scalar unknowns
-    #     mass_mat = scipy.sparse.kron(time_fe.matrix["mass"], space_fe.matrix["mass"])
-    #     W_mass_mat = scipy.sparse.kron(time_fe.matrix["W_mass"], space_fe.matrix["mass"])
-    #     WW_mass_mat = scipy.sparse.kron(time_fe.matrix["WW_mass"], space_fe.matrix["mass"])
-    #     stiffness_mat = scipy.sparse.kron(
-    #         time_fe.matrix["mass"], space_fe.matrix["laplace"]
-    #     )
-    #     derivative_mat = scipy.sparse.kron(
-    #         time_fe.matrix["derivative"], space_fe.matrix["mass"]
-    #     )
-
-    #     # Space-time matrices for vectorial unknowns
-    #     sys_mat = scipy.sparse.block_array([[derivative_mat, -mass_mat], [stiffness_mat, derivative_mat]])
-    #     # the next term from the PWE
-    #     sys_mat += scipy.sparse.block_array([[W_mass_mat, None], [WW_mass_mat, W_mass_mat]])
-
-    #     # Right hand side vector
-    #     xt_dofs = cart_prod_coords(time_fe.dofs, space_fe.dofs)
-    #     rhs0 = mass_mat.dot(exact_rhs_0(xt_dofs))
-    #     rhs1 = mass_mat.dot(exact_rhs_1(xt_dofs))
-    #     rhs = np.concatenate((rhs0, rhs1))
-
-    #     # Impose IC+BC
-    #     sys_mat, rhs, X0D = impose_IC_BC(sys_mat, rhs, space_fe, time_fe, boundary_data_u, boundary_data_v, X0)
-
-    #     return sys_mat, rhs, X0D
