@@ -13,5 +13,8 @@ dependencies = [
     "matplotlib"
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov", "ruff", "mypy"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/ctg"]
