@@ -57,10 +57,12 @@ class CTGSolver():
         total_n_dofs = 0
         for i, slab in enumerate(time_slabs):
             vprint(f"Slab_{i} = D x ({round(slab[0], 4)}, {round(slab[1], 4)}) ...", self.verbose)
+            
+            # Iterate
             n_dofs_curr, X = self.iterate(boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, W_t, slab, space_time_fe, X0)
+            
             total_n_dofs += n_dofs_curr
             sol_slabs.append(X)
-            
             # Final condition (FC) becomes IC on next slab
             X0 = np.zeros_like(X0)
             X0[space_time_fe.dofs_IC]=X[space_time_fe.dofs_FC]
@@ -83,7 +85,7 @@ class CTGSolver():
         if sys_mat is None:
             raise RuntimeError("System matrix is None. Aborting computation.")
             
-            # Solve
+        # Solve
         X = scipy.sparse.linalg.spsolve(sys_mat, rhs)
         residual = np.linalg.norm(sys_mat.dot(X) - rhs) / np.linalg.norm(X)
         vprint(f"Relative residual norm: {residual:.2e}", self.verbose)

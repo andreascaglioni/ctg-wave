@@ -9,8 +9,7 @@ from ctg.utils import cart_prod_coords
 
 class SpaceFE:
     def __init__(self, V: fem.FunctionSpace, boundary_D=None):
-        # Sanity check input
-        assert V.value_size == 1  # always give 1d condomain FE space
+        assert V.value_size == 1, "lways use 1d condomain FE space"
         self.mesh = V.mesh
         self.V = V
         self.form = {}
