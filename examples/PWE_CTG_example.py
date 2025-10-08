@@ -20,13 +20,15 @@ import matplotlib.pyplot as plt
 from mpi4py import MPI
 from dolfinx import fem, mesh
 import csv
-import sys
+import os
+import argparse
+from datetime import datetime
 from mpl_toolkits.mplot3d import Axes3D
 from ctg.brownian_motion import param_LC_W
 from ctg.post_process import float_f, compute_energy_tt, plot_uv_tt
 from ctg.ctg_solver import CTGSolver
 from ctg.utils import inverse_DS_transform
-import argparse
+
 
 
 def main():
@@ -35,6 +37,8 @@ def main():
     np.random.seed(seed)
     comm = MPI.COMM_SELF
     np.set_printoptions(formatter={"float_kind": float_f})
+    dir_save = os.path.join("results", "dir_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+    os.makedirs(dir_save, exist_ok=True)
 
     # PARAMETERS
     # Parse inputs from call
@@ -111,13 +115,13 @@ def main():
     
     # Export to CSV u_final, v_final
     dofs = space_fe.dofs.flatten()
-    csv_filename_uv = "wave_uv_final.csv"
+    csv_filename_uv =  os.path.join(dir_save, "wave_uv_final.csv")
     with open(csv_filename_uv, mode="w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["dof", "u_final", "v_final"])
         for d, uf, vf in zip(dofs, u_final, v_final):
             writer.writerow([d, uf, vf])
-    csv_filename = "WW_wave_energy.csv"
+    csv_filename = os.path.join(dir_save, "WW_wave_energy.csv")
     with open(csv_filename, mode="w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["tt", "WW", "EE"])
