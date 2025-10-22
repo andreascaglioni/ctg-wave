@@ -9,14 +9,14 @@ from ctg.utils import cart_prod_coords
 
 class SpaceFE:
     def __init__(self, V: fem.FunctionSpace, boundary_D=None):
-        assert V.value_size == 1, "lways use 1d condomain FE space"
-        self.mesh = V.mesh
+        # Sanity check input
+        assert V.value_size == 1, f"SpaceFE: Condomain of V must be 1D, not {V.value_size}"
         self.V = V
         self.form = {}
         self.matrix = {}
         dofs_raw = self.V.tabulate_dof_coordinates()
         # NB dofs are always 3d! -> Truncate
-        gdim = self.mesh.geometry.dim
+        gdim = V.mesh.geometry.dim
         self.dofs = dofs_raw[:, 0 : gdim].reshape((-1, gdim))
         self.n_dofs = self.dofs.shape[0]
         self.assemble_matrices()
@@ -52,12 +52,11 @@ class SpaceFE:
 
 class TimeFE:
     # use assemble_matrices_W(W_t) to assemble W_mass, WW_mass
-    def __init__(self, mesh, V, verbose=False):
-        assert V.value_size == 1
+    def __init__(self, V, verbose=False):
+        assert V.value_size == 1, f"TimeFE: Codomain FE space ust be 1 not {V.value_size}"
         self.form = {}
         self.matrix = {}
-        self.mesh = mesh
-        gdim = mesh.geometry.dim
+        gdim = V.mesh.geometry.dim
         self.V = V
         self.dofs = self.V.tabulate_dof_coordinates()[:, 0 : gdim].reshape((-1, gdim))
         self.n_dofs = self.dofs.shape[0]
@@ -159,8 +158,8 @@ class SpaceTimeFE:
         dofs_fc_tx_scalar = np.kron(dofs_fc_t, np.ones(n_dofs_x))
         self.dofs_FC = np.tile(dofs_fc_tx_scalar, 2).astype(bool)
 
-    def interpolate(self, f) -> np.ndarray | None:
-        # TODO works only for LAgrangian FEM. Impement projection
+    def interpolate(self, f) -> np.ndarray:
+        # TODO works only for Lagrangian FEM. Implement projection
         return f(self.dofs)
     
     def assemble(self, W_y):

@@ -2,7 +2,6 @@
 of space-time problems, such as paraboic and hyperbolic PDEs."""
 
 import numpy as np
-import sys
 
 
 def cart_prod_coords(t_coords, x_coords):
@@ -39,27 +38,6 @@ def compute_time_slabs(start_time, end_time, slab_size):
     while time_slabs[-1][1] < end_time - 1e-10:
         time_slabs.append((time_slabs[-1][1], time_slabs[-1][1] + slab_size))
     return time_slabs
-
-def inverse_DS_transform(XX, WW_fun, space_fe, time_fe):
-    """Apply the inverse Doss-Sussmann transform to a sample solution of the parametric Andreson model (a parametric wave equation) to obtain a sample solution of the stochastic Anderson model (a stochastic wave equation). 
-
-    Args:
-        xx (np.ndarray): Coordinates (in space time FE basis) of a sample solution of the RWE (or PWE evaluated at a random standard Gaussian vector) over 1 space-time slab. First havlf is u, second is v = partial_t u. For both u and v, coords are 1st wrt time basis, then space basis (using tensor prodcut space time FEM basis).
-        WW_fun (Callable[[np.ndarray], np.ndarray]): A callable that takes an array of times and returns the values of a (LC-expansion of the) Brownian motion at those times.
-        space_fe(SpaceFE): Class for space finite elements.
-        time_fe(TimeFE): Class for time finite elements corresponding to the same time slab as xx.
-
-    Returns:
-        np.ndarray: Sample solution of the SWE obtained via the inverse Doss-Sussmann transform.
-    """
-
-    n_scalar = int(XX.size/2)
-    n_x = space_fe.n_dofs
-    uu = XX[:n_scalar]
-    vv = XX[n_scalar:]
-    WW = WW_fun(time_fe.dofs)
-    WW_rep = np.repeat(WW, n_x)
-    return np.concatenate((uu, vv + WW_rep*uu))
 
 def vprint(str, verbose = True):
     """

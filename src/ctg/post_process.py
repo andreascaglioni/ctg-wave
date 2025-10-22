@@ -175,3 +175,18 @@ def plot_on_slab(dofs_x, dofs_t, X):
     ax.set_zlabel('Value (c)')
     plt.tight_layout()
     plt.show()
+
+
+def inverse_DS_transform(XX, WW_fun, space_fe, time_slab, comm, order_t):
+    """Apply DS transform for single time"""
+
+    msh_t = mesh.create_interval(comm, 1, [time_slab[0], time_slab[1]])
+    V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
+    time_fe = TimeFE(V_t)
+    n_scalar = int(XX.size/2)
+    n_x = space_fe.n_dofs
+    uu = XX[:n_scalar]
+    vv = XX[n_scalar:]
+    WW = WW_fun(time_fe.dofs)
+    WW_rep = np.repeat(WW, n_x)
+    return np.concatenate((uu, vv + WW_rep*uu))

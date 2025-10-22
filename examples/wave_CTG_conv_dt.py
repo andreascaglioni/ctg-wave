@@ -11,11 +11,11 @@ from dolfinx import fem, mesh
 import sys
 
 sys.path.insert(0, "./")
-from CTG.brownian_motion import param_LC_W
-from CTG.ctg_solver import CTGSolver
-from CTG.error import compute_err
-from CTG.post_process import float_f
-from CTG.post_process import compute_rate, compute_energy_tt
+from ctg.brownian_motion import param_LC_W
+from ctg.ctg_solver import CTGSolver
+from ctg.error import compute_err
+from ctg.post_process import float_f, compute_rate, compute_energy_tt
+
 
 if __name__ == "__main__":
     # SETTINGS
@@ -119,7 +119,9 @@ if __name__ == "__main__":
     plt.figure()
     for i, dt in enumerate(ddt):
         tt = np.linspace(start_time, end_time, int(1/dt))
-        plt.plot(tt, EE[i], 'o-', linewidth=2, label="dt = "+str(dt))
+        color_intensity = (i + 1) / len(ddt)
+        col = plt.get_cmap('Blues')(0.3 + 0.7 * color_intensity)
+        plt.plot(tt, EE[i], 'o-', linewidth=2, label="dt = "+str(dt), color=col)
     plt.legend()
     plt.ylim(np.min([np.min(E) for E in EE]), np.max([np.max(E) for E in EE]))
     plt.xlabel("Time")

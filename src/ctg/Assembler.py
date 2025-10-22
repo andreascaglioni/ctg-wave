@@ -41,7 +41,7 @@ class AssemblerWave:
         D_mat = self.space_time_fe.matrix["D_t"]
         M_xt = self.space_time_fe.matrix["M"]
         A0_no_bc = scipy.sparse.block_array([[D_mat, -M_xt], [L_mat, D_mat]])
-        # L_mat goes with + sign becaus eit actualkly represent grad-grad term
+        # L_mat goes with + sign becaus it actually represent grad-grad term
         # Right hand side vector
         xt_dofs = self.space_time_fe.dofs
         rhs0 = M_xt.dot(exact_rhs_0(xt_dofs))
@@ -72,6 +72,7 @@ class AssemblerWave:
                         exact_rhs_1,
                         boundary_data_u, 
                         boundary_data_v):
+        # TODO Add possiblity to input A0_no_bc and A_W_no_bc
         
         # Assemble linear system operator
         A0_no_bc, b_no_bc = self.assemble_A0_b(exact_rhs_0, exact_rhs_1)

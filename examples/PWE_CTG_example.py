@@ -25,9 +25,9 @@ import argparse
 from datetime import datetime
 from mpl_toolkits.mplot3d import Axes3D
 from ctg.brownian_motion import param_LC_W
-from ctg.post_process import float_f, compute_energy_tt, plot_uv_tt
+from ctg.post_process import float_f, compute_energy_tt, plot_uv_tt, inverse_DS_transform
 from ctg.ctg_solver import CTGSolver
-from ctg.utils import inverse_DS_transform
+from ctg.post_process import inverse_DS_transform
 
 
 
@@ -96,31 +96,32 @@ def main():
     ctg_solver = CTGSolver(numerics_params, verbose=False)
     sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(physics_params)
     
+    # Inverse DOss Sussmann transform
+    XX = [inverse_DS_transform(sol_slabs[i], physics_params["W_t"], space_time_fe.space_fe, time_slabs[i], comm, order_t) for i in range(len(sol_slabs))]
+
     print("POST PROCESS")
-    # Revert last iteratrion to solution SWE with inverse Doss-Sussman transform
     space_fe = space_time_fe.space_fe
+    dofs = space_fe.dofs.flatten()
     n_x = space_fe.n_dofs
-    time_fe_last = space_time_fe.time_fe
     n_scalar=int(sol_slabs[0].size/2)
-    XX = inverse_DS_transform(sol_slabs[-1], physics_params["W_t"], space_fe, time_fe_last)
-    UU_final = XX[n_scalar-n_x:n_scalar]
-    VV_final = XX[-n_x:]
+    XX_T = XX[-1]
+    U_T = XX_T[n_scalar-n_x:n_scalar]  
+    V_T = XX_T[-n_x:]
+    tt = np.linspace(start_time, end_time, ceil((end_time-start_time)/t_slab_size))
 
     # Compute metrics
-    tt = np.linspace(start_time, end_time, ceil((end_time-start_time)/t_slab_size))
     WW = physics_params["W_t"](tt)
-    EE, ppot, kkin = compute_energy_tt(space_fe, sol_slabs)
-    u_final = sol_slabs[-1][n_scalar-n_x:n_scalar]
-    v_final = sol_slabs[-1][-n_x:]
+    EE, ppot, kkin = compute_energy_tt(space_fe, XX)
     
     # Export to CSV u_final, v_final
-    dofs = space_fe.dofs.flatten()
-    csv_filename_uv =  os.path.join(dir_save, "wave_uv_final.csv")
+    csv_filename_uv = os.path.join(dir_save, "wave_uv_final.csv")
     with open(csv_filename_uv, mode="w", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["dof", "u_final", "v_final"])
-        for d, uf, vf in zip(dofs, u_final, v_final):
+        writer.writerow(["dof", "U_T", "V_T"])
+        for d, uf, vf in zip(dofs, U_T, V_T):
             writer.writerow([d, uf, vf])
+    
+    # Export to CSV tt, WW, EE
     csv_filename = os.path.join(dir_save, "WW_wave_energy.csv")
     with open(csv_filename, mode="w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -142,17 +143,15 @@ def main():
     plt.tight_layout()
     plt.xlabel("t")
 
-    # Plot u, v and solution original SDE at final time 
+    # Plot solution original SDE at final time 
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
     y_min, y_max = np.amin(sol_slabs[-1]), np.amax(sol_slabs[-1])
-    axs[0].plot(space_fe.dofs, u_final, ".-", label="u numerical")
-    axs[0].plot(space_fe.dofs, UU_final, ".-", label="U (inverse D.S. transform of u)")
-    axs[0].set_title(f"u at final time t={round(time_slabs[-1][1], 4)}")
+    axs[0].plot(space_fe.dofs, U_T, ".-", label="U(T) (numerical)")
+    axs[0].set_title(f"U at final time t={round(time_slabs[-1][1], 4)}")
     axs[0].set_xlabel("x")
     axs[0].legend()
-    axs[1].plot(space_fe.dofs, v_final, ".-", label="v numerical")
-    axs[1].plot(space_fe.dofs, VV_final, ".-", label="V (inverse D.S. transform of v)")
-    axs[1].set_title(f"v at final time t={round(time_slabs[-1][1], 4)}")
+    axs[1].plot(space_fe.dofs, V_T, ".-", label="V(T) (numerical)")
+    axs[1].set_title(f"V at final time t={round(time_slabs[-1][1], 4)}")
     axs[1].set_xlabel("x")
     axs[1].legend()
     plt.tight_layout()
@@ -161,23 +160,23 @@ def main():
     axs[0].set_ylim(ymin, ymax)
     axs[1].set_ylim(ymin, ymax)
 
-    # Plot u(t,x0) for fixed x0, as function of t
-    plt.figure("u(t, x0) vs t")
+    # Plot U(t,x0) for fixed x0, as function of t
+    plt.figure("U(t, x0) vs t")
     n_dof_track = int(space_fe.n_dofs/4)
-    u_t = np.array([sol_slab[n_dof_track] for sol_slab in sol_slabs])
-    plt.plot(tt, u_t, '.-')
-    plt.title("u(t, x0) for x0 = "+str(space_fe.dofs[n_dof_track]))
-    plt.tight_layout()
+    U_T = np.array([X[n_dof_track] for X in XX])
+    plt.plot(tt, U_T, '.-')
+    plt.title("U(t, x0) for x0 = "+str(space_fe.dofs[n_dof_track]))
     plt.xlabel("t")
+    plt.tight_layout()
 
     # plot_uv_tt(time_slabs, space_fe, sol_slabs)
 
     # 3D plot u sspace-time
     plt.figure()
     X, Y = np.meshgrid(space_fe.dofs, tt)
-    U = np.array([sol_slab[:space_fe.n_dofs] for sol_slab in sol_slabs])
+    UU = np.array([X[:space_fe.n_dofs] for X in XX])
     ax = plt.axes(projection='3d')
-    ax.plot_surface(X, Y, U, cmap='viridis')
+    ax.plot_surface(X, Y, UU, cmap='viridis')
     ax.set_xlabel('x')
     ax.set_ylabel('t')
     ax.set_title('Space-time solution u surface')

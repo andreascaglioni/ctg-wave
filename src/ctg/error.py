@@ -15,14 +15,14 @@ def compute_error_slab(sol_slab, exact_sol, space_time_fe, err_type_x, err_type_
 
     # refine Time
     
-    msh_t = space_time_fe.time_fe.mesh
+    msh_t = space_time_fe.time_fe.V.mesh
     msh_t_ref = mesh.refine(msh_t)[0]
     p_t_trial = space_time_fe.time_fe.V.element.basix_element.degree
     V_t_ref = fem.functionspace(msh_t_ref, ("Lagrange", p_t_trial))
-    time_fe_ref = TimeFE(msh_t_ref, V_t_ref)
+    time_fe_ref = TimeFE(V_t_ref)
 
     # refine Space
-    msh_x = space_time_fe.space_fe.mesh
+    msh_x = space_time_fe.space_fe.V.mesh
     msh_x_ref = mesh.refine(msh_x)[0]
     p_Space = space_time_fe.space_fe.V.element.basix_element.degree
     V_x_ref = fem.functionspace(msh_x_ref, ("Lagrange", p_Space))
@@ -83,8 +83,8 @@ def compute_err(comm,
     for i, slab in enumerate(time_slabs):
         # Current time FE
         msh_t = mesh.create_interval(comm, 1, [slab[0], slab[1]])
-        V_t_trial = fem.functionspace(msh_t, ("Lagrange", order_t))
-        time_fe = TimeFE(msh_t, V_t_trial)
+        V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
+        time_fe = TimeFE(V_t)
         space_time_fe = SpaceTimeFE(space_fe, time_fe)
         X = sol_slabs[i]
         err_slabs[i], norm_u_slabs[i] = compute_error_slab(X, sol_exa, space_time_fe, err_type_x, err_type_t)

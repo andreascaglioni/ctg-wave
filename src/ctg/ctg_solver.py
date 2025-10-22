@@ -44,11 +44,11 @@ class CTGSolver():
         slab = time_slabs[0]
         msh_t = mesh.create_interval(self.comm, 1, [slab[0], slab[1]])
         V_t = fem.functionspace(msh_t, ("Lagrange", self.order_t))
-        time_fe = TimeFE(msh_t, V_t)
+        time_fe = TimeFE(V_t)
         space_time_fe = SpaceTimeFE(space_fe, time_fe)
 
         # Compute coordinates initial condition
-        U0 = space_time_fe.interpolate(initial_data_u)  # DOFs vector
+        U0 = space_time_fe.interpolate(initial_data_u)   # DOFs vector
         V0 = space_time_fe.interpolate(initial_data_v)
         X0 = np.concatenate((U0, V0))
         
@@ -70,16 +70,21 @@ class CTGSolver():
         return sol_slabs, time_slabs, space_time_fe, total_n_dofs
 
     def iterate(self, boundary_data_u, boundary_data_v, exact_rhs_0, exact_rhs_1, W_t, slab, space_time_fe, X0):
+
         # Assemble time FE curr slab
+
+        # TODO factory for time_fe given slab, fem degree, fem type. Make time_fe factory as class.,__init__ input
         msh_t = mesh.create_interval(self.comm, 1, [slab[0], slab[1]])
         V_t = fem.functionspace(msh_t, ("Lagrange", self.order_t))
-        time_fe = TimeFE(msh_t, V_t)
+        time_fe = TimeFE(V_t)
 
         # Update time_fe in space_time_fe and assemble all needed operators
         space_time_fe.update_time_fe(time_fe)
         space_time_fe.assemble(W_t)
 
+        # TODO make class member and use AssemblerWave.update_space_time_fe
         assembler = AssemblerWave(space_time_fe)
+
         sys_mat, rhs, X0D = assembler.assemble_system(W_t, X0, exact_rhs_0, exact_rhs_1,boundary_data_u, boundary_data_v)
 
         if sys_mat is None:
@@ -87,9 +92,11 @@ class CTGSolver():
             
         # Solve
         X = scipy.sparse.linalg.spsolve(sys_mat, rhs)
+        # add self.debug and run this only if self.debug=True
         residual = np.linalg.norm(sys_mat.dot(X) - rhs) / np.linalg.norm(X)
         vprint(f"Relative residual norm: {residual:.2e}", self.verbose)
             
-            # Restore IC and BC
+        # Re-introduce IC and BC
         X = X + X0D
+
         return space_time_fe.n_dofs, X

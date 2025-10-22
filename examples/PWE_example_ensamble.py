@@ -9,10 +9,9 @@ from dolfinx import fem, mesh
 import csv
 import sys
 sys.path.insert(0, ".")
-from CTG.brownian_motion import param_LC_W
-from CTG.post_process import float_f, compute_energy_tt, plot_uv_tt
-from CTG.ctg_solver import CTGSolver
-from CTG.utils import inverse_DS_transform
+from ctg.brownian_motion import param_LC_W
+from ctg.ctg_solver import CTGSolver
+from ctg.post_process import float_f, compute_energy_tt, plot_uv_tt, inverse_DS_transform
 
 
 if __name__ == "__main__":
@@ -70,8 +69,9 @@ if __name__ == "__main__":
     err_type_t = "l2"
 
     tt = np.linspace(start_time, end_time, ceil(1/t_slab_size))
+    n_samples = 10
 
-    for seed in range(10):
+    for seed in range(n_samples):
         print("Sample", seed+1)
         np.random.seed(seed)
         y = np.random.standard_normal(100)
@@ -81,20 +81,22 @@ if __name__ == "__main__":
         # COMPUTE
         ctg_solver = CTGSolver(numerics_params, verbose=False)
         sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(physics_params)
+
+        XX = [inverse_DS_transform(sol_slabs[i], W_t, space_time_fe.space_fe, time_slabs[i], comm, order_t) for i in range(len(sol_slabs))]
    
         # POST PROCESS
         space_fe = space_time_fe.space_fe
 
         # Plot energy
-        EE, _, _ = compute_energy_tt(space_fe, sol_slabs)
+        EE, _, _ = compute_energy_tt(space_fe, XX)
         plt.figure("energy")
         plt.plot(tt, EE, '-', linewidth=2)
 
-        # Plot u(t,x0) for fixed x0, as finction of t
+        # Plot U(t,x0) for fixed x0, as finction of t
         n_dof_track = int(space_fe.n_dofs/4)
         plt.figure("track")
-        u_t = np.array([sol_slab[n_dof_track] for sol_slab in sol_slabs])
-        plt.plot(tt, u_t, '-', linewidth=2)
+        U_t = np.array([X[n_dof_track] for X in XX])
+        plt.plot(tt, U_t, '-', linewidth=2)
 
         plt.figure("W")
         plt.plot(tt, W_t(tt), '-', linewidth=2)
