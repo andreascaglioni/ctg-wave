@@ -5,5 +5,7 @@ results/
 .vscode/
 CTG_parabolic/
 delete/
+results/
+
 test_script.py
 *.csv
