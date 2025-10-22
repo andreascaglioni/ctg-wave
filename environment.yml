@@ -1,0 +1,25 @@
+name: ctg-wave
+channels:
+  - conda-forge
+dependencies:
+  # ---- Core runtime (Fenicsx / numerics) ----
+  - python>=3.10,<3.13
+  - fenics-dolfinx
+  - numpy
+  - scipy
+  - mpi4py
+  - petsc4py
+  - matplotlib
+  - pyyaml
+  - matplotlib
+  # ---- CLI / config ----
+  - typer
+  - pydantic>=2
+  # ---- Dev / QA (install in the same env for simplicity) ----
+  - pytest
+  - pytest-cov
+  - hypothesis
+  - mypy
+  - ruff
+  - black
+  - pre-commit
