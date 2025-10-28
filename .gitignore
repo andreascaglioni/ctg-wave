@@ -7,5 +7,5 @@ CTG_parabolic/
 delete/
 results/
 
-test_script.py
+tmp.py
 *.csv
