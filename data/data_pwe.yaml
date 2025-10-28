@@ -31,4 +31,4 @@ numerics:
   t_slab_size: 0.01
   order_t: 1
 
-  verbose: False
+  verbose: True
