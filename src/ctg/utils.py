@@ -39,7 +39,8 @@ def compute_time_slabs(start_time, end_time, slab_size):
         time_slabs.append((time_slabs[-1][1], time_slabs[-1][1] + slab_size))
     return time_slabs
 
-def vprint(str, verbose = True):
+
+def vprint(str, verbose=True):
     """
     Prints the given string if verbose is True.
     Args:
@@ -51,3 +52,12 @@ def vprint(str, verbose = True):
 
     if verbose:
         print(str)
+
+
+def have_dolfinx() -> bool:
+    try:
+        import dolfinx  # noqa: F401
+
+        return True
+    except Exception:
+        return False

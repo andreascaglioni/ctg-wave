@@ -12,17 +12,17 @@ class SpaceFE:
         # Sanity check input
         assert V.value_size == 1, f"SpaceFE: Condomain of V must be 1D, not {V.value_size}"
         self.V = V
-        self.form = {}
-        self.matrix = {}
+        self.form: dict[str, fem.Form] = {}
+        self.matrix: dict[str, scipy.sparse.csr_matrix] = {}
         dofs_raw = self.V.tabulate_dof_coordinates()
         # NB dofs are always 3d! -> Truncate
         gdim = V.mesh.geometry.dim
-        self.dofs = dofs_raw[:, 0 : gdim].reshape((-1, gdim))
+        self.dofs = dofs_raw[:, 0:gdim].reshape((-1, gdim))
         self.n_dofs = self.dofs.shape[0]
         self.assemble_matrices()
         # initialize self.boundary_dof_vector (if boundary given)
         if boundary_D is not None:
-            self.compute_bd_dofs(boundary_D)  
+            self.compute_bd_dofs(boundary_D)
 
     def assemble_matrices(self):
         u = ufl.TrialFunction(self.V)
@@ -40,14 +40,15 @@ class SpaceFE:
 
     def compute_bd_dofs(self, boundary_D):
         u_D = fem.Function(self.V)
-        u_D.interpolate(lambda x : 0. * x[0])  # dummy boundary data, need only dofs  # noqa: F811 # TODO fix issue above         
+        u_D.interpolate(
+            lambda x: 0.0 * x[0]
+        )  # dummy boundary data, need only dofs  # noqa: F811 # TODO fix issue above
         dofs_boundary = fem.locate_dofs_geometrical(self.V, boundary_D)
         bc = fem.dirichletbc(value=u_D, dofs=dofs_boundary)
         # Compute *indicator function* of boundary
         self.boundary_dof_vector = np.zeros((self.n_dofs * self.V.value_size,))
         for i in bc.dof_indices()[0]:  # bc.dof_indices() is 2-tuple
             self.boundary_dof_vector[i] = 1.0
-
 
 
 class TimeFE:
@@ -58,16 +59,16 @@ class TimeFE:
         self.matrix = {}
         gdim = V.mesh.geometry.dim
         self.V = V
-        self.dofs = self.V.tabulate_dof_coordinates()[:, 0 : gdim].reshape((-1, gdim))
+        self.dofs = self.V.tabulate_dof_coordinates()[:, 0:gdim].reshape((-1, gdim))
         self.n_dofs = self.dofs.shape[0]
         self.verbose = False
         # Compute *indicator functions* of IC and FC (final condition)
         self.dof_IC_vector = np.zeros(self.n_dofs)
-        self.dof_IC_vector[np.argmin(self.dofs)] = 1.
+        self.dof_IC_vector[np.argmin(self.dofs)] = 1.0
         self.dof_FC_vector = np.zeros(self.n_dofs)
-        self.dof_FC_vector[np.argmax(self.dofs)] = 1.
+        self.dof_FC_vector[np.argmax(self.dofs)] = 1.0
         self.assemble_matrices_0()
-        
+
     def print_dofs(self):
         print("\nTime DOFs")
         for dof, dof_t in zip(self.V.dofmap().dofs(), self.dofs):
@@ -95,7 +96,6 @@ class TimeFE:
         f = fem.form((ufl.grad(u)[0] * ufl.grad(phi)[0]) * ufl.dx)
         self._add_form_matrix("derivative", f)
 
-
     def assemble_matrices_W(self, W_t=None):
         """Assemble all W-depndent mantrices. W_t is a callable."""
         if W_t is None:
@@ -115,20 +115,18 @@ class TimeFE:
         return self.matrix["W_mass"], self.matrix["WW_mass"]
 
 
-
 class SpaceTimeFE:
     """Stores and computes space-time operators. No boundary and initial conditions."""
 
-    def __init__(self, 
-                 space_fe: SpaceFE, 
-                 time_fe: 'TimeFE | None' = None,
-                 verbose: bool = False):
-        
+    def __init__(self, space_fe: SpaceFE, time_fe: "TimeFE | None" = None, verbose: bool = False):
+
         self.space_fe = space_fe
         self.time_fe = time_fe
         self.verbose = verbose
-        self.matrix = {}  # dictionary space time operators
-        if type(time_fe) is TimeFE: 
+        self.matrix: dict[str, scipy.sparse.csr_matrix] = (
+            {}
+        )  # dictionary space time operators matrices
+        if type(time_fe) is TimeFE:
             self.update_time_fe(time_fe)
         else:
             self.dofs = np.array([[]])
@@ -142,7 +140,7 @@ class SpaceTimeFE:
         self.dofs = cart_prod_coords(self.time_fe.dofs, self.space_fe.dofs)
         self.n_dofs = self.dofs.shape[0]
         self.update_IC_FC_dofs()
-    
+
     def update_IC_FC_dofs(self):
         if self.time_fe is None:
             if self.verbose:
@@ -161,7 +159,7 @@ class SpaceTimeFE:
     def interpolate(self, f) -> np.ndarray:
         # TODO works only for Lagrangian FEM. Implement projection
         return f(self.dofs)
-    
+
     def assemble(self, W_y):
         """Assemble all operators."""
         self.assemble_noW()
@@ -190,7 +188,7 @@ class SpaceTimeFE:
         if W_t is None:
             if self.verbose:
                 print("SpaceTimeFE Warning: W_T is None. Skip assembly W-dependent operators.")
-            return 
+            return
         self.time_fe.assemble_matrices_W(W_t)
         M_Wt = self.time_fe.matrix["W_mass"]
         M_W2t = self.time_fe.matrix["WW_mass"]
