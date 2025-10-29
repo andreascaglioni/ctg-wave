@@ -3,6 +3,7 @@ from dolfinx.fem.petsc import assemble_matrix
 import numpy as np
 import scipy.sparse
 import ufl
+from typing import Dict
 
 from ctg.utils import cart_prod_coords
 
@@ -12,8 +13,8 @@ class SpaceFE:
         # Sanity check input
         assert V.value_size == 1, f"SpaceFE: Condomain of V must be 1D, not {V.value_size}"
         self.V = V
-        self.form: dict[str, fem.Form] = {}
-        self.matrix: dict[str, scipy.sparse.csr_matrix] = {}
+        self.form: Dict[str, fem.Form] = {}
+        self.matrix: Dict[str, scipy.sparse.csr_matrix] = {}
         dofs_raw = self.V.tabulate_dof_coordinates()
         # NB dofs are always 3d! -> Truncate
         gdim = V.mesh.geometry.dim
@@ -123,7 +124,7 @@ class SpaceTimeFE:
         self.space_fe = space_fe
         self.time_fe = time_fe
         self.verbose = verbose
-        self.matrix: dict[str, scipy.sparse.csr_matrix] = (
+        self.matrix: Dict[str, scipy.sparse.csr_matrix] = (
             {}
         )  # dictionary space time operators matrices
         if type(time_fe) is TimeFE:

@@ -1,9 +1,6 @@
-from math import sqrt
 import matplotlib.pyplot as plt
 import numpy as np
 from dolfinx import fem, io, mesh
-import sys
-from mpl_toolkits.mplot3d import Axes3D
 
 from ctg.FE_spaces import TimeFE
 from ctg.utils import cart_prod_coords
@@ -35,6 +32,7 @@ def compute_rate(xx, yy):
     """
 
     return np.log(yy[1:] / yy[:-1]) / np.log(xx[1:] / xx[:-1])
+
 
 def export_xdmf(msh, f, tt=np.array([]), filename="plot.xdmf"):
     """
@@ -79,7 +77,9 @@ def plot_basis_functions(msh_x, V_x):
 
 def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=None):
     n_x = space_fe.n_dofs
-    assert sol_slabs[0].size % 2 == 0, "sol_slabs[0].size must be even, got {}".format(sol_slabs[0].size)
+    assert sol_slabs[0].size % 2 == 0, "sol_slabs[0].size must be even, got {}".format(
+        sol_slabs[0].size
+    )
     n_dofs_scalar = int(sol_slabs[0].size / 2)
 
     # Compute bounds y axis
@@ -107,7 +107,7 @@ def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=No
 
         # Plot v on the right subplot
         ax2 = plt.subplot(1, 2, 2)
-        vv = X[n_dofs_scalar:n_dofs_scalar+n_x]
+        vv = X[n_dofs_scalar : n_dofs_scalar + n_x]
         ax2.plot(space_fe.dofs, vv, ".", label=f"v at t={round(slab[0], 4)}")
         if exact_sol_v is not None:
             ax2.plot(space_fe.dofs, exact_sol_v(tx), "-", label="v exact")
@@ -115,7 +115,7 @@ def plot_uv_tt(time_slabs, space_fe, sol_slabs, exact_sol_u=None, exact_sol_v=No
         ax2.legend()
         ax2.set_ylim((vmin, vmax))
         plt.tight_layout()
-        
+
         plt.pause(0.1)
 
 
@@ -123,8 +123,8 @@ def plot_error_tt(time_slabs, err_slabs, norm_u_slabs):
     times = [slab[1] for slab in time_slabs]
     rel_errs = err_slabs / norm_u_slabs
     plt.figure()
-    plt.plot(times, err_slabs, marker='o', label="error")
-    plt.plot(times, rel_errs, marker='o', label="relative error")
+    plt.plot(times, err_slabs, marker="o", label="error")
+    plt.plot(times, rel_errs, marker="o", label="relative error")
     plt.xlabel("Time")
     plt.title("Error over time")
     plt.legend()
@@ -141,38 +141,36 @@ def compute_energy_tt(space_fe, sol_slabs):
         Tuple of arrays: (total energy, potential energy, kinetic energy) at each time step.
     """
 
-    M =space_fe.matrix["mass"]  # mass
+    M = space_fe.matrix["mass"]  # mass
     A = space_fe.matrix["laplace"]  # stiffness
     n_x = space_fe.n_dofs
-    n_scalar = int(sol_slabs[0].size/2)
+    n_scalar = int(sol_slabs[0].size / 2)
     eenergy = np.zeros(len(sol_slabs))
     ppot = np.zeros(len(sol_slabs))  # potential energy
     kkin = np.zeros(len(sol_slabs))  # kinetic energy
 
     for i, X in enumerate(sol_slabs):
         u = X[0:n_x]
-        v = X[n_scalar:n_scalar+n_x]
+        v = X[n_scalar : n_scalar + n_x]
         ppot[i] = u @ A @ u
         kkin[i] = v @ M @ v
         eenergy[i] = ppot[i] + kkin[i]
-        
+
     return eenergy, ppot, kkin
 
 
-
-
 def plot_on_slab(dofs_x, dofs_t, X):
-    A, B = np.meshgrid(dofs_t, dofs_x, indexing='ij')
+    A, B = np.meshgrid(dofs_t, dofs_x, indexing="ij")
     A_flat = A.flatten()
     B_flat = B.flatten()
     C_flat = X.flatten()
 
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot_trisurf(A_flat, B_flat, C_flat, cmap='viridis', edgecolor='none')
-    ax.set_xlabel('Time (a)')
-    ax.set_ylabel('Space (b)')
-    ax.set_zlabel('Value (c)')
+    ax = fig.add_subplot(111, projection="3d")
+    ax.plot_trisurf(A_flat, B_flat, C_flat, cmap="viridis", edgecolor="none")
+    ax.set_xlabel("Time (a)")
+    ax.set_ylabel("Space (b)")
+    ax.set_zlabel("Value (c)")
     plt.tight_layout()
     plt.show()
 
@@ -183,10 +181,10 @@ def inverse_DS_transform(XX, WW_fun, space_fe, time_slab, comm, order_t):
     msh_t = mesh.create_interval(comm, 1, [time_slab[0], time_slab[1]])
     V_t = fem.functionspace(msh_t, ("Lagrange", order_t))
     time_fe = TimeFE(V_t)
-    n_scalar = int(XX.size/2)
+    n_scalar = int(XX.size / 2)
     n_x = space_fe.n_dofs
     uu = XX[:n_scalar]
     vv = XX[n_scalar:]
     WW = WW_fun(time_fe.dofs)
     WW_rep = np.repeat(WW, n_x)
-    return np.concatenate((uu, vv + WW_rep*uu))
+    return np.concatenate((uu, vv + WW_rep * uu))

@@ -14,7 +14,7 @@ from math import sqrt
 def compute_error_slab(sol_slab, exact_sol, space_time_fe, err_type_x, err_type_t):
 
     # refine Time
-    
+
     msh_t = space_time_fe.time_fe.V.mesh
     msh_t_ref = mesh.refine(msh_t)[0]
     p_t_trial = space_time_fe.time_fe.V.element.basix_element.degree
@@ -35,9 +35,7 @@ def compute_error_slab(sol_slab, exact_sol, space_time_fe, err_type_x, err_type_
     # Interpolate numerical sol using griddata (linear interpolation)
     # TODO works only for Lagrangian FE
     coarse_coords = space_time_fe.dofs
-    sol_slab_ref = griddata(
-        coarse_coords, sol_slab, fine_coords, method="linear", fill_value=0.0
-    )
+    sol_slab_ref = griddata(coarse_coords, sol_slab, fine_coords, method="linear", fill_value=0.0)
 
     # Adapt to error type
     if err_type_x == "h1":
@@ -51,7 +49,7 @@ def compute_error_slab(sol_slab, exact_sol, space_time_fe, err_type_x, err_type_
 
     if err_type_t == "l2":
         ip_tx = scipy.sparse.kron(time_fe_ref.matrix["mass_err"], ip_space_ref)
-        err = sqrt((ip_tx @ err_fun_ref) @ err_fun_ref )   # ip_tx.dot(err_fun_ref).dot(err_fun_ref))
+        err = sqrt((ip_tx @ err_fun_ref) @ err_fun_ref)  # ip_tx.dot(err_fun_ref).dot(err_fun_ref))
         norm_u = sqrt((ip_tx @ (sol_slab_ref)) @ (sol_slab_ref))
     elif err_type_t == "linf":
         err = -1.0
@@ -68,15 +66,7 @@ def compute_error_slab(sol_slab, exact_sol, space_time_fe, err_type_x, err_type_
     return err, norm_u
 
 
-def compute_err(comm, 
-                order_t, 
-                err_type_x, 
-                err_type_t, 
-                time_slabs, 
-                space_fe, 
-                sol_slabs, 
-                sol_exa):
-    
+def compute_err(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, sol_exa):
 
     err_slabs = -1.0 * np.ones(len(time_slabs))
     norm_u_slabs = -1.0 * np.ones_like(err_slabs)
@@ -87,14 +77,15 @@ def compute_err(comm,
         time_fe = TimeFE(V_t)
         space_time_fe = SpaceTimeFE(space_fe, time_fe)
         X = sol_slabs[i]
-        err_slabs[i], norm_u_slabs[i] = compute_error_slab(X, sol_exa, space_time_fe, err_type_x, err_type_t)
-
+        err_slabs[i], norm_u_slabs[i] = compute_error_slab(
+            X, sol_exa, space_time_fe, err_type_x, err_type_t
+        )
 
     if err_type_t == "linf":
         total_err = np.amax(err_slabs)
         total_norm_u = np.amax(norm_u_slabs)
     elif err_type_t == "l2":
-        ddt = np.array([ts[1]-ts[0] for ts in time_slabs])
+        ddt = np.array([ts[1] - ts[0] for ts in time_slabs])
         total_err = sqrt(np.dot(ddt, np.square(err_slabs)))
         total_norm_u = sqrt(np.dot(ddt, np.square(norm_u_slabs)))
     else:
