@@ -106,6 +106,9 @@ class physicsCfg(BaseModel):
     All functions should accept X with shape (n_points, 2) where columns are [t, x].
 
     Attributes:
+
+        exact_sol_u: Exact solution for displacement.
+        exact_sol_v: Exact solution for verlocity.
         initial_data_u: Initial condition for displacement u(x, t=0).
             Default returns zeros.
         initial_data_v: Initial condition for velocity v(x, t=0).
@@ -130,6 +133,7 @@ class physicsCfg(BaseModel):
         - Direct callables: lambda X: np.sin(X[:, 1])
         - String paths: "module.submodule:function_name"
         - Dicts with params: {"path": "module:func", "params": {"a": 1}}
+        - exact_sol_u and exact_sol_v are optional
 
     Example:
         >>> physics = physicsCfg(
@@ -141,6 +145,15 @@ class physicsCfg(BaseModel):
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    exact_sol_u: Callable[..., Any] = Field(
+        default=lambda X: np.zeros(X.shape[0]),
+        description="Exact solution for displacement u",
+    )
+    exact_sol_v: Callable[..., Any] = Field(
+        default=lambda X: np.zeros(X.shape[0]),
+        description="Exact solution for velocity v",
+    )
 
     initial_data_u: Callable[..., Any] = Field(
         default=lambda X: np.zeros(X.shape[0]),
@@ -178,6 +191,8 @@ class physicsCfg(BaseModel):
         "boundary_D",
         "rhs_0",
         "rhs_1",
+        "exact_sol_u",
+        "exact_sol_v",
         mode="before",
     )
     @classmethod

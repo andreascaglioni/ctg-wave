@@ -3,7 +3,7 @@ from math import ceil, log, sqrt
 
 
 def param_LC_W(yy, tt, T):
-    """Pythonic computation of the LC expansion of the Wiener process.
+    """Computation of the LC expansion of the Wiener process.
 
     Args:
         yy (numpy.ndarray[float]): Parameter vector for the expansion.
@@ -23,8 +23,9 @@ def param_LC_W(yy, tt, T):
     tt = tt.flatten()
     assert len(tt.shape) == 1
     tol = 1e-12
-    assert np.amin(tt) >= -tol and np.amax(tt) <= T + tol, "param_LC_Brownian_motion: tt not within [0,T] (with tolerance)"
-
+    assert (
+        np.amin(tt) >= -tol and np.amax(tt) <= T + tol
+    ), "param_LC_Brownian_motion: tt not within [0,T] (with tolerance)"
 
     # Get # LC-levels
     L = ceil(log(yy.shape[1], 2))  # number of levels
@@ -35,6 +36,7 @@ def param_LC_W(yy, tt, T):
     BB = LC_matrix(L, tt, T)
     W = np.matmul(yy, BB)
     return W
+
 
 def LC_matrix(L: int, tt: np.ndarray, T: float) -> np.ndarray:
     """
@@ -47,7 +49,6 @@ def LC_matrix(L: int, tt: np.ndarray, T: float) -> np.ndarray:
         np.ndarray: A (dim_y, len(tt)) matrix where each row is a basis function evaluated at the given time points.
     """
 
-
     n_t = tt.size
     # Rescale tt (to be reverted!)
     tt = tt / T
@@ -59,9 +60,7 @@ def LC_matrix(L: int, tt: np.ndarray, T: float) -> np.ndarray:
         for j in range(1, n_j + 1):
             basis_fun = 0 * tt  # basis is 0 where not assegned below
             # define increasing part basis function
-            ran1 = np.where(
-                (tt >= (2 * j - 2) / (2**lev)) & (tt <= (2 * j - 1) / (2**lev))
-            )
+            ran1 = np.where((tt >= (2 * j - 2) / (2**lev)) & (tt <= (2 * j - 1) / (2**lev)))
             basis_fun[ran1] = tt[ran1] - (2 * j - 2) / 2**lev
             # define decreasing part basis function
             ran2 = np.where((tt >= (2 * j - 1) / (2**lev)) & (tt <= (2 * j) / (2**lev)))
@@ -69,5 +68,5 @@ def LC_matrix(L: int, tt: np.ndarray, T: float) -> np.ndarray:
             n_b = 2 ** (lev - 1) + j - 1  # prev. lev.s (complete) + curr. lev (partial)
             BB[n_b, :] = 2 ** ((lev - 1) / 2) * basis_fun
     # Revert time rescaling
-    BB *= sqrt(T)   
+    BB *= sqrt(T)
     return BB

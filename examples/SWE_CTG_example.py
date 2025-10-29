@@ -47,7 +47,7 @@ def main():
     ctg_solver = CTGSolver(config.numerics)
     sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(config.physics, W_t)
 
-    # Inverse Doss-Sussmann transform (reover solution SWE)
+    # Inverse Doss-Sussmann transform (recover solution SWE)
     XX = [
         inverse_DS_transform(
             sol_slabs[i],

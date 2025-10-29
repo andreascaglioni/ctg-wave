@@ -14,10 +14,10 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def run(
     data_file: Path = typer.Argument(
-        Path("data/data_pwe.yaml"), help="Path to YAML data file (e.g., `data/data_pwe.yaml`)"
+        Path("data/data_swe.yaml"), help="Path to YAML data file (e.g., `data/data_swe.yaml`)"
     )
 ):
-    """Run CTG wave equation solver with configuration from YAML data file. If no data file is given, use `data/data_pwe.yaml`."""
+    """Run CTG wave equation solver with configuration from YAML data file. If no data file is given, use `data/data_swe.yaml`."""
 
     cfg: AppConfig = load_config(data_file)
     v = cfg.numerics.verbose
@@ -50,6 +50,7 @@ def run(
         plt.title("DOFs solutiojn (U and V) final time")
         plt.plot(space_time_fe.space_fe.dofs, U_dofs, ".-", label="U")
         plt.plot(space_time_fe.space_fe.dofs, V_dofs, ".-", label="V")
+        plt.legend()
         plt.show()
 
 
