@@ -16,14 +16,14 @@ dependencies = [
 ]
 
 [project.scripts]
-ctg-wave = "ctg_wave.cli:app"
-                                                                                
+ctg = "ctg.cli:app"
+
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
-addopts = "-q --cov=ctg_wave --cov-report=term-missing --cov-fail-under=85"
+addopts = "-v --cov=ctg --cov-report=term-missing --cov-fail-under=85"
 testpaths = ["tests"]
 
 [tool.ruff]
