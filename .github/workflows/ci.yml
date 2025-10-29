@@ -1,0 +1,26 @@
+name: CI
+on:
+  push: { branches: [ main ] }
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          activate-environment: ctg-wave
+          environment-file: environment.yml
+          channels: conda-forge
+      - name: Install package (editable) + hooks
+        shell: bash -l {0}
+        run: |
+          pip install -e .
+          pre-commit install
+      - name: Pre-commit
+        shell: bash -l {0}
+        run: pre-commit run --all-files
+      - name: Pytest
+        shell: bash -l {0}
+        run: pytest
