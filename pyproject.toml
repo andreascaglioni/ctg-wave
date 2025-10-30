@@ -1,5 +1,5 @@
 [project]
-name = "CTG"
+name = "ctg-wave"
 version = "0.1.0"
 description = "Continuous Time Galerkin space-time FEM for stochastic wave equations"
 readme = "README.md"

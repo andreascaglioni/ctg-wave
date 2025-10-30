@@ -9,3 +9,4 @@ results/
 
 tmp.py
 *.csv
+.coverage

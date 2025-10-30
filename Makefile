@@ -8,11 +8,10 @@ check-conda:
 test: check-conda
 	pytest
 
-# 3. Run a demo example (YAML config is passed directly, no --config flag)
-# Example usage:
-#    make example FILE=examples/wave1d_deterministic.yaml
+# 3. Run a demo example. Usage: make example FILE=examples/wave1d_deterministic.yaml
 example: check-conda
-	python -m ctg.cli $(FILE)
+	@if [ -z "$(FILE)" ]; then FILE=examples/swe.yaml; fi; \
+	ctg run $$FILE
 
 # 4. Clean temporary and build artifacts
 clean:

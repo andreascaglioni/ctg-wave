@@ -20,7 +20,7 @@ A Python object-oriented code for solving parametric wave equations using Contin
 - Post-processing and error analysis tools
 
 ## QuickStart
-For those who have no time to lose.
+For those who have no time to lose:
 
 ```bash
 mamba env create -f environment.yml
@@ -44,6 +44,8 @@ git clone git@github.com:andreascaglioni/CTG_wave.git
 mamba env create -f environment.yml
 conda activate ctg-wave
 ```
+
+**Note:** This package has only been tested with dolfinx v0.9.0.
 
 3. Install the package + hooks
 ```sh
