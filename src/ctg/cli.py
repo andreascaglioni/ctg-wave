@@ -2,11 +2,13 @@ from pathlib import Path
 from matplotlib import pyplot as plt
 import typer
 import numpy as np
+import logging
 
 from ctg.ctg_solver import CTGSolver
 from ctg.brownian_motion import param_LC_W
 from ctg.config import AppConfig, load_config
-from ctg.utils import vprint
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(add_completion=False)
 
@@ -21,7 +23,11 @@ def run(
 
     cfg: AppConfig = load_config(data_file)
     v = cfg.numerics.verbose
-    vprint(f"Configuration loaded from YAML data file: {data_file}", verbose=v)
+
+    # Configure logging level based on verbose setting
+    logging.basicConfig(level=logging.INFO if v else logging.WARNING, format="%(message)s")
+
+    logger.info(f"Configuration loaded from YAML data file: {data_file}")
     if v:
         for key, value in cfg.__dict__.items():
             print(f"{key}:")
@@ -37,9 +43,9 @@ def run(
     ctg_solver = CTGSolver(cfg.numerics)
     sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(cfg.physics, W_t)
 
-    vprint(f"Time slabs (print max 5): {time_slabs[:min(len(time_slabs), 5)]}")
-    vprint(f"Solution computed on {len(sol_slabs)} time slabs", v)
-    vprint(f"Total degrees of freedom: {total_n_dofs}", v)
+    logger.info(f"Time slabs (print max 5): {time_slabs[:min(len(time_slabs), 5)]}")
+    logger.info(f"Solution computed on {len(sol_slabs)} time slabs")
+    logger.info(f"Total degrees of freedom: {total_n_dofs}")
     if v:
         n_scalar = space_time_fe.n_dofs
         n_x = space_time_fe.space_fe.n_dofs

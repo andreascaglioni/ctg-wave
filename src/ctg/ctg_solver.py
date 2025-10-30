@@ -3,11 +3,14 @@ import numpy as np
 import scipy.sparse
 from dolfinx import fem, mesh
 import warnings
+import logging
 
 sys.path.append("./")
 from ctg.FE_spaces import TimeFE, SpaceFE, SpaceTimeFE
 from ctg.Assembler import AssemblerWave
-from ctg.utils import compute_time_slabs, vprint
+from ctg.utils import compute_time_slabs
+
+logger = logging.getLogger(__name__)
 
 
 class CTGSolver:
@@ -46,7 +49,7 @@ class CTGSolver:
         sol_slabs = []
         total_n_dofs = 0
         for i, slab in enumerate(time_slabs):
-            vprint(f"Slab_{i} = D x ({round(slab[0], 4)}, {round(slab[1], 4)}) ...", self.verbose)
+            logger.info(f"Slab_{i} = D x ({round(slab[0], 4)}, {round(slab[1], 4)}) ...")
 
             # Iterate
             n_dofs_curr, X = self.iterate(
@@ -82,18 +85,18 @@ class CTGSolver:
         space_time_fe.assemble(W_t)
 
         # TODO make class member and use AssemblerWave.update_space_time_fe
-        vprint("\tAssembling space-time system", self.verbose)
+        logger.info("\tAssembling space-time system")
         assembler = AssemblerWave(space_time_fe)
         sys_mat, rhs, X0D = assembler.assemble_system(W_t, X0, rhs_0, rhs_1, bc_u, bc_v)
         if sys_mat is None:
             raise RuntimeError("System matrix is None. Aborting computation.")
 
         # Solve
-        vprint("\tSolving space-time system", self.verbose)
+        logger.info("\tSolving space-time system")
         X = scipy.sparse.linalg.spsolve(sys_mat, rhs)
         # add self.debug and run this only if self.debug=True
         residual = np.linalg.norm(sys_mat.dot(X) - rhs) / np.linalg.norm(X)
-        vprint(f"\tRelative residual norm: {residual:.2e}", self.verbose)
+        logger.info(f"\tRelative residual norm: {residual:.2e}")
 
         # Re-introduce IC and BC
         X = X + X0D

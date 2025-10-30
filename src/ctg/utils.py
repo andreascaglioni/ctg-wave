@@ -40,20 +40,6 @@ def compute_time_slabs(start_time, end_time, slab_size):
     return time_slabs
 
 
-def vprint(str, verbose=True):
-    """
-    Prints the given string if verbose is True.
-    Args:
-        str (str): The string to print.
-        verbose (bool, optional): If True, prints the string. Defaults to True.
-    Returns:
-        None
-    """
-
-    if verbose:
-        print(str)
-
-
 def have_dolfinx() -> bool:
     try:
         import dolfinx  # noqa: F401
