@@ -1,13 +1,13 @@
 from pathlib import Path
 import numpy as np
-from ctg.config import load_config
 import sys
 
-sys.path.insert(0, ".")
+sys.path.insert(0, "./")
+from ctg.config import load_config
 
 
-def test_data_from_yaml():
-    cfg = load_config(Path("tests/artifacts/data_swe.yaml"))
+def test_load_data_from_yaml():
+    cfg = load_config(Path("tests/artifacts/data_swe_test.yaml"))
     x = np.linspace(0.0, 1.0, 5)
     t = np.zeros_like(x)
     X = np.column_stack([t, x])  # (N, 2) with columns [t, x]
