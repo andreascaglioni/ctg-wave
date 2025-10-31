@@ -25,7 +25,6 @@ Example:
         )
 """
 
-from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import yaml
 from typing import Callable, Any, Union, Optional
@@ -265,6 +264,12 @@ class numericsCfg(BaseModel):
         return v
 
 
+class postCfg(BaseModel):
+    """Post-processing configuration."""
+
+    dir_save: str = Field(..., description="Directory where outputs will be saved")
+
+
 class AppConfig(BaseModel):
     """Main application configuration container.
 
@@ -293,9 +298,10 @@ class AppConfig(BaseModel):
     numerics: numericsCfg = Field(
         default_factory=numericsCfg, description="Numerical discretization configuration"
     )
+    post: postCfg = Field(default_factory=postCfg, description="Post-processing configuration")
 
 
-def load_config(p: Path) -> AppConfig:
+def load_config(text: str) -> AppConfig:
     """Load configuration from a YAML file.
 
     Reads a YAML file and creates a validated AppConfig instance.
@@ -327,6 +333,6 @@ def load_config(p: Path) -> AppConfig:
         >>> #   n_cells_space: 100
         >>> #   end_time: 1.0
     """
-    with open(p, "r") as f:
-        data = yaml.safe_load(f)
+    # with open(p, "r") as f:
+    data = yaml.safe_load(text)
     return AppConfig(**data)

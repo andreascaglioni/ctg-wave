@@ -1,28 +1,46 @@
 from pathlib import Path
 import json
-import shutil
 import subprocess
 from datetime import datetime
+import yaml
 
 
-def save_run_metadata(config_path: Path, dir_prefix: str, extra: dict | None = None):
-    """Save reproducibility metadata (config file, commit hash, timestamp, etc.)."""
-    date_time = datetime.now().isoformat(timespec="seconds")
-    results_dir = Path("results") / (dir_prefix + "_" + date_time)
+def save_run_metadata(text_config: str, results_dir: Path, extra: dict | None = None):
+    """Save reproducibility metadata for a run.
+
+    Creates a timestamped results directory and saves configuration files and git metadata
+    for full reproducibility of the experiment/run.
+
+    Args:
+        config_path: Path to the configuration YAML file to be copied. It is looked for in the rpoject root.
+        results_dir: Directory where the results are saved. It is created in the project root.
+        extra: Optional dictionary of additional metadata to include in meta.json.
+
+    Returns:
+        None
+
+    Raises:
+        None: Exceptions during config file copying are caught and logged as warnings.
+
+    Note:
+        - Creates directory: results/{dir_prefix}_{timestamp}/
+        - Copies config_path to results_dir/config_used.yaml
+        - Copies companion {config_path}_functions.py if it exists
+        - Saves git info (commit, branch, dirty status) to results_dir/meta.json
+        - Git information defaults to "unknown" if git commands fail
+    """
+
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy the YAML file for full reproducibility
-    config_path_funs = config_path.parent / (config_path.stem + "_functions.py")
-    config_copy = results_dir / "config_used.yaml"
-    config_copy_funs = results_dir / "config_used_functions.py"
+    config_copy_path = results_dir / "config_used.yaml"
     try:
-        # copy configurations .yaml file
-        shutil.copy(config_path, config_copy)
-        # Also copy the functions file with name config_path+"_functions.py"
-        if config_path_funs.exists():
-            shutil.copy(config_path_funs, config_copy_funs)
+        # shutil.copy(config_path, config_copy_path)
+        config_copy_path.write_text(text_config)
     except Exception as e:
-        print(f"Warning: could not copy config files: {e}")
+        print(f"Warning: could not copy cnofig file: {e}")
+
+    # TODO Copy the file with Callables used in yaml config file
 
     # Gather git info
     def git_info(cmd):
@@ -37,8 +55,7 @@ def save_run_metadata(config_path: Path, dir_prefix: str, extra: dict | None = N
 
     meta = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "config_original": str(config_path),
-        "config_copy": str(config_copy),
+        "config_copy": str(config_copy_path),
         "commit": commit,
         "branch": branch,
         "dirty": dirty,
@@ -48,3 +65,14 @@ def save_run_metadata(config_path: Path, dir_prefix: str, extra: dict | None = N
 
     with open(results_dir / "meta.json", "w") as f:
         json.dump(meta, f, indent=2)
+
+
+def get_config_functions_file_path(config_text):
+    # Get name of file (py) containing callabels uised by config yaml (input path)
+
+    # 1. Get "."-separated file name from config_path
+    config_data_dict = yaml.safe_load(config_text)
+    boundary_D_callable = config_data_dict.get("physics").get("boundary_D")
+    config_path_funs = boundary_D_callable.split(":")[0]
+    # 2. Convert dots to slashes to create a path
+    return Path(config_path_funs.replace(".", "/"))
