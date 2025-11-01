@@ -18,6 +18,9 @@ dependencies = [
 [project.scripts]
 ctg = "ctg.cli:app"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/ctg"]
+
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
@@ -29,6 +32,3 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/ctg"]

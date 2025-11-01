@@ -3,16 +3,20 @@ import json
 import subprocess
 from datetime import datetime
 import yaml
+from typing import Union
 
 
-def save_run_metadata(text_config: str, results_dir: Path, extra: dict | None = None):
+def save_run_metadata(
+    config_source: Union[Path, str], results_dir: Path, extra: dict | None = None
+):
     """Save reproducibility metadata for a run.
 
     Creates a timestamped results directory and saves configuration files and git metadata
     for full reproducibility of the experiment/run.
 
     Args:
-        config_path: Path to the configuration YAML file to be copied. It is looked for in the rpoject root.
+        config_source: Either a Path to the configuration YAML file or a string containing
+            the YAML configuration content.
         results_dir: Directory where the results are saved. It is created in the project root.
         extra: Optional dictionary of additional metadata to include in meta.json.
 
@@ -24,7 +28,7 @@ def save_run_metadata(text_config: str, results_dir: Path, extra: dict | None = 
 
     Note:
         - Creates directory: results/{dir_prefix}_{timestamp}/
-        - Copies config_path to results_dir/config_used.yaml
+        - Copies config to results_dir/config_used.yaml
         - Copies companion {config_path}_functions.py if it exists
         - Saves git info (commit, branch, dirty status) to results_dir/meta.json
         - Git information defaults to "unknown" if git commands fail
@@ -32,13 +36,18 @@ def save_run_metadata(text_config: str, results_dir: Path, extra: dict | None = 
 
     results_dir.mkdir(parents=True, exist_ok=True)
 
+    # Get YAML text from source (either read from Path or use string directly)
+    if isinstance(config_source, Path):
+        text_config = config_source.read_text(encoding="utf-8")
+    else:
+        text_config = config_source
+
     # Copy the YAML file for full reproducibility
     config_copy_path = results_dir / "config_used.yaml"
     try:
-        # shutil.copy(config_path, config_copy_path)
         config_copy_path.write_text(text_config)
     except Exception as e:
-        print(f"Warning: could not copy cnofig file: {e}")
+        print(f"Warning: could not copy config file: {e}")
 
     # TODO Copy the file with Callables used in yaml config file
 

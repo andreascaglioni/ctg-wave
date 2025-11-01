@@ -25,6 +25,7 @@ Example:
         )
 """
 
+from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import yaml
 from typing import Callable, Any, Union, Optional
@@ -301,38 +302,47 @@ class AppConfig(BaseModel):
     post: postCfg = Field(default_factory=postCfg, description="Post-processing configuration")
 
 
-def load_config(text: str) -> AppConfig:
-    """Load configuration from a YAML file.
+def load_config(source: Union[Path, str]) -> AppConfig:
+    """Load configuration from a YAML file path or YAML string content.
 
-    Reads a YAML file and creates a validated AppConfig instance.
-    Automatically resolves string references to callable functions.
+    Accepts either a Path to a YAML file or a string containing YAML content.
+    Creates a validated AppConfig instance and automatically resolves string
+    references to callable functions.
 
     Args:
-        p: Path to YAML configuration file.
+        source: Either a Path object pointing to a YAML configuration file,
+            or a string containing YAML content.
 
     Returns:
         AppConfig: Validated configuration object with all settings loaded
             and callables resolved.
 
     Raises:
-        FileNotFoundError: If the YAML file doesn't exist.
-        yaml.YAMLError: If the YAML file is malformed.
+        FileNotFoundError: If source is a Path and the file doesn't exist.
+        yaml.YAMLError: If the YAML content is malformed.
         pydantic.ValidationError: If the configuration doesn't match the schema.
 
     Example:
         >>> from pathlib import Path
+        >>> # Load from file path
         >>> config = load_config(Path("configs/wave_eq.yaml"))
         >>> print(config.numerics.n_cells_space)
         100
 
-        >>> # YAML file format:
-        >>> # physics:
-        >>> #   initial_data_u: "data.data_functions_pwe:initial_u"
-        >>> #   rhs_0: "data.data_functions_pwe:rhs_0"
-        >>> # numerics:
-        >>> #   n_cells_space: 100
-        >>> #   end_time: 1.0
+        >>> # Load from YAML string
+        >>> yaml_str = '''
+        ... physics:
+        ...   initial_data_u: "data.data_functions_pwe:initial_u"
+        ... numerics:
+        ...   n_cells_space: 100
+        ... '''
+        >>> config = load_config(yaml_str)
     """
-    # with open(p, "r") as f:
-    data = yaml.safe_load(text)
+    # Determine if source is a Path or string content
+    if isinstance(source, Path):
+        yaml_text = source.read_text(encoding="utf-8")
+    else:
+        yaml_text = source
+
+    data = yaml.safe_load(yaml_text)
     return AppConfig(**data)

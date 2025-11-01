@@ -1,3 +1,10 @@
+""" The cli can be run
+1. `python -m cli.py`
+2. `ctg`  # or as defined in pyproject.toml
+
+--config-path Add custom YAML configuration file
+--help Diplay help for function"""
+
 from datetime import datetime
 from pathlib import Path
 from matplotlib import pyplot as plt
@@ -9,10 +16,10 @@ from importlib.resources import files
 from ctg.ctg_solver import CTGSolver
 from ctg.brownian_motion import param_LC_W
 from ctg.config import AppConfig, load_config
+from ctg.post_process import inverse_DS_transform
 from ctg.save_metadata import save_run_metadata
 
 logger = logging.getLogger(__name__)
-
 app = typer.Typer(add_completion=False)
 
 
@@ -22,11 +29,13 @@ def run(
         None, help="Path to YAML data file. Use a default file if none provided"
     )
 ):
-    """Run CTG wave equation solver with configuration from YAML data file. If no data file is given, use default."""
+    """Run CTG apprximation of a stochastic wave equation sample path. Problem and solver parameters are set from a YAML data file."""
 
-    # Initialize configuration class
-    text_yaml = get_yaml_text(config_path)
-    cfg: AppConfig = load_config(text_yaml)
+    if config_path is None:
+        logger.info("Using packaged default parameters.")
+        config_path = files("ctg.default_data") / "data_swe.yaml"
+
+    cfg: AppConfig = load_config(config_path)
 
     # Set the logging verbosity from config
     set_log_verbosity(config_path, cfg)
@@ -42,11 +51,24 @@ def run(
     ctg_solver = CTGSolver(cfg.numerics)
     sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(cfg.physics, W_t)
 
+    # Transofrm to solution correspoding SWE
+    sol_slabs = [
+        inverse_DS_transform(
+            sol_slabs[i],
+            W_t,
+            space_time_fe.space_fe,
+            time_slabs[i],
+            cfg.numerics.comm,
+            cfg.numerics.order_t,
+        )
+        for i in range(len(sol_slabs))
+    ]
+
     # Log partial results
     logger.info("Computation completed successfully")
     logger.info(f"Number of time slabs: {len(time_slabs)}")
-    logger.info(f"Spatial DOFs per time slab: {space_time_fe.space_fe.n_dofs}")
     logger.info(f"Temporal DOFs per time slab: {space_time_fe.time_fe.n_dofs}")
+    logger.info(f"Spatial DOFs per time slab: {space_time_fe.space_fe.n_dofs}")
     logger.info(f"Space-time DOFs per slab: {space_time_fe.n_dofs}")
     logger.info(f"Total DOFs (all slabs): {total_n_dofs}")
 
@@ -55,12 +77,12 @@ def run(
     results_dir = Path(cfg.post.dir_save + "_" + date_time)
 
     save_run_metadata(
-        text_yaml,
+        config_path,
         results_dir,
         extra={
-            "n_dofs_space": space_time_fe.space_fe.n_dofs,
-            "n_dofs_1_t_slab": space_time_fe.time_fe.n_dofs,
             "n_time_slabs": len(time_slabs),
+            "n_dofs_1_t_slab": space_time_fe.time_fe.n_dofs,
+            "n_dofs_space": space_time_fe.space_fe.n_dofs,
             "n_dofs_xt_slab": space_time_fe.n_dofs,
             "total_n_dofs": total_n_dofs,
         },
@@ -83,20 +105,6 @@ def run(
     logger.info(f"Solution data saved to {results_dir}")
 
     return 0
-
-
-def get_yaml_text(config_path):
-    # Load either user config or default
-    if config_path is None:
-        text_yaml = (files("ctg.default_data") / "data_swe.yaml").read_text(encoding="utf-8")
-        logger.info("Using packaged default configuration.")
-    else:
-        try:
-            text_yaml = config_path.read_text(encoding="utf-8")
-        except Exception as e:
-            logger.info(f"Could not read configurations: {e}")
-            raise typer.Exit(code=1)
-    return text_yaml
 
 
 def set_log_verbosity(config, cfg):
