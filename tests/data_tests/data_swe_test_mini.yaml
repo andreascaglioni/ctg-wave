@@ -1,0 +1,37 @@
+# test_config
+
+physics:
+  boundary_D: "ctg.default_data.data_swe_functions:boundary_D"
+  start_time: 0.
+  end_time: 1.
+
+  # Initial conditions
+  initial_data_u: "ctg.default_data.data_swe_functions:initial_data_u"
+  initial_data_v: "ctg.default_data.data_swe_functions:initial_data_v"
+
+  # Boundary conditions
+  boundary_data_u: "ctg.default_data.data_swe_functions:boundary_data_u"
+  boundary_data_v: "ctg.default_data.data_swe_functions:boundary_data_v"
+
+  # Right-hand side forcing terms
+  rhs_0: "ctg.default_data.data_swe_functions:rhs_0"
+  rhs_1: "ctg.default_data.data_swe_functions:rhs_1"
+
+
+numerics:
+  # Reporducibility: set seed
+  seed: 0
+
+  # Space
+  n_cells_space: 10
+  order_x: 1
+  comm: ctg.default_data.data_swe_functions:comm
+
+  # Time
+  t_slab_size: 0.1
+  order_t: 1
+
+  verbose: False
+
+post:
+  dir_save: "results_tests/test_run_ctg_mini"
