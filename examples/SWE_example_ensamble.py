@@ -7,7 +7,8 @@ from math import ceil
 import matplotlib.pyplot as plt
 from ctg.brownian_motion import param_LC_W
 from ctg.ctg_solver import CTGSolver
-from ctg.post_process import float_f, compute_energy_tt, inverse_DS_transform
+from ctg.plotting import float_f
+from ctg.post_process import compute_energy_tt, inverse_DS_transform
 from ctg.config import load_config
 
 
@@ -17,13 +18,12 @@ if __name__ == "__main__":
 
     # PARAMETERS
     # Import data from Config
-    data_dir = Path(__file__).parent.parent / "data"
-    data_file = data_dir / "data_pwe.yaml"
-    config = load_config(data_file)
+    data_file = Path("examples/data_examples/data_swe.yaml")
+    cfg = load_config(data_file)
 
-    s_t = config.physics.start_time
-    e_t = config.physics.end_time
-    dt = config.numerics.t_slab_size
+    s_t = cfg.physics.start_time
+    e_t = cfg.physics.end_time
+    dt = cfg.numerics.t_slab_size
     tt = np.linspace(s_t, e_t, ceil(1 / dt))
     n_samples = 10
 
@@ -35,11 +35,11 @@ if __name__ == "__main__":
         y = np.random.standard_normal(100)
 
         def W_t(tt):
-            return param_LC_W(y, tt, T=config.physics.end_time)[0]
+            return param_LC_W(y, tt, T=cfg.physics.end_time)[0]
 
         print("RUN CTG")
-        ctg_solver = CTGSolver(config.numerics)
-        sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(config.physics, W_t)
+        ctg_solver = CTGSolver(cfg.numerics)
+        sol_slabs, time_slabs, space_time_fe, total_n_dofs = ctg_solver.run(cfg.physics, W_t)
 
         XX = [
             inverse_DS_transform(
@@ -47,8 +47,8 @@ if __name__ == "__main__":
                 W_t,
                 space_time_fe.space_fe,
                 time_slabs[i],
-                config.numerics.comm,
-                config.numerics.order_t,
+                cfg.numerics.comm,
+                cfg.numerics.order_t,
             )
             for i in range(len(sol_slabs))
         ]
