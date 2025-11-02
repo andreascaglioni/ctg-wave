@@ -1,5 +1,6 @@
 # CTG_wave
-A Python object-oriented code for solving parametric wave equations using Continuous Time Galerkin (CTG) methods with a focus on uncertainty quantification.
+
+Continuous-Time Galerkin (CTG) space-time finite element method (FEM) for deterministic and stochastic wave equations.
 
 ## Table of Contents
 - [Features](#features)
@@ -23,14 +24,29 @@ A Python object-oriented code for solving parametric wave equations using Contin
 For those who have no time to lose:
 
 ```bash
+
+# create and activate the conda environment
 mamba env create -f environment.yml
 conda activate ctg-wave
-pip install -e .
-pre-commit install
 
-# Run via console script with a YAML for new data, without YAML for example using data/data_swe.yaml
-ctg run data/data_swe.yaml
+# install
+pip install -e .
+
+# Run default example (uses data in ctg/presets/swe.yaml)
+ctg
+
+# Or run with new custom data:
+ctg --config-path examples/data_examples/data_swe.yaml
+
+# run tests
+pytest -q
 ```
+
+The command produces results under `results/<timestamp>/` containing:
+
+- `meta.json`: Simulation metadata and simple metrics on the output
+- `config_used.yaml`: A copy of the configuration file containing problem data and solver parameters
+- numerical outputs / plots
 
 ## Detailed Installation
 
@@ -53,40 +69,36 @@ pip install -e .
 pre-commit install
 ```
 
-4. Run the tiny deterministic demo (leapfrog reference)
+4. Run the CLI script with default parameters
 ```sh
 python -m ctg.cli
 ```
 
-5. Run Pytest tests (options in pyproject.toml)
+5. Run Pytest tests (options set in `pyproject.toml`)
 ```sh
 pytest
 ```
 
-3. Run the tests (from the project root directory):
-```sh
-python -m pytest tests/
-```
-
 ## Usage
-The program can be run from the command line with a yaml file containing the physics and numerics data:
+The program can be run from the command line with a YAML file containing the physics and numerics data:
 ```sh
-ctg run [data/your_config.yaml]
+ctg --config-path [data/your_config.yaml]
 ```
 
-If no YAML file is provided, the program will use `data/data_swe.yaml`.
+If no YAML file is provided, the program will use a default file `ctg/default_data/data_swe.yaml`.
 
-Give a look to the `data/data_swe.yaml` file to understand how it is structured. Note that there is also a file `data/data_swe_funcs.py` containing the callables referenced in `data/data_swe.yaml` (e.g. initial and boundary data functions).
+Give a look to it to understand how it is structured. Note that in the same directory there is a file `data_swe_functions.py` containing the callables referenced in `data_swe.yaml` (e.g., initial and boundary data functions).
 
 More examples are available in the `examples/` directory:
 
-- `examples/SWE_CTG_example.py` - Basic parametric wave equation example
+- `examples/SWE_CTG_example.py` - Basic parametric wave equation example, similar to the CLI script
 - `examples/WE_CTG_conv_dt.py` - Time step convergence study
 - `examples/SWE_example_ensamble.py` - Ensemble simulation example
 
-To generate different meshes: See example in `examples/generate_meshes_square.py`
+## Documentation
+The documentation contains detailed API reference and mathematical background.
 
-Read the documentation for detailed API reference and mathematical background.
+
 
 ## Contributing
 Contributions are welcome! Please open an issue or submit a pull request.

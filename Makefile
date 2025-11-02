@@ -10,9 +10,8 @@ test: check-conda
 
 # 3. Run a demo example. Usage: make example FILE=examples/wave1d_deterministic.yaml
 example: check-conda
-	@if [ -z "$(FILE)" ]; then FILE=examples/swe.yaml; fi; \
-	ctg run $$FILE
+	ctg
 
 # 4. Clean temporary and build artifacts
 clean:
-	rm -rf __pycache__ */__pycache__ .pytest_cache .coverage dist build artifacts
+	rm -rf results __pycache__ */__pycache__ .pytest_cache

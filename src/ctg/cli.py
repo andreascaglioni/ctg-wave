@@ -14,16 +14,18 @@ import numpy as np
 import logging
 from importlib.resources import files
 
-try:
-    import dolfinx  # noqa:F401
-except Exception as e:
-    raise SystemExit("dolfinx is required. Activate the conda env from environment.yml.") from e
-
 from ctg.ctg_solver import CTGSolver
 from ctg.brownian_motion import param_LC_W
 from ctg.config import AppConfig, load_config
 from ctg.post_process import inverse_DS_transform
 from ctg.save_metadata import save_run_metadata
+
+
+# First try importing DOLFINx
+try:
+    import dolfinx  # noqa:F401
+except Exception as e:
+    raise SystemExit("dolfinx is required. Activate the conda env from environment.yml.") from e
 
 logger = logging.getLogger(__name__)
 app = typer.Typer(add_completion=False)
