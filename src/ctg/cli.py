@@ -1,6 +1,7 @@
-""" The cli can be run
+""" The cli can be run as:
 1. `python -m cli.py`
-2. `ctg`  # or as defined in pyproject.toml
+2. `ctg`  # as defined in pyproject.toml
+3. from ctg import cli; cli.run()
 
 --config-path Add custom YAML configuration file
 --help Diplay help for function"""
@@ -104,7 +105,7 @@ def run(
 
     logger.info(f"Solution data saved to {results_dir}")
 
-    return 0
+    return results_dir
 
 
 def set_log_verbosity(config, cfg):

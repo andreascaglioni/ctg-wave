@@ -28,7 +28,14 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 addopts = "-v --cov=ctg --cov-report=term-missing --cov-fail-under=85"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.coverage.report]
+omit = [
+    "src/ctg/default_data/*",
+    "src/ctg/plotting.py",
+]

@@ -2,7 +2,6 @@ from pathlib import Path
 import json
 import subprocess
 from datetime import datetime
-import yaml
 from typing import Union
 
 
@@ -74,14 +73,3 @@ def save_run_metadata(
 
     with open(results_dir / "meta.json", "w") as f:
         json.dump(meta, f, indent=2)
-
-
-def get_config_functions_file_path(config_text):
-    # Get name of file (py) containing callabels uised by config yaml (input path)
-
-    # 1. Get "."-separated file name from config_path
-    config_data_dict = yaml.safe_load(config_text)
-    boundary_D_callable = config_data_dict.get("physics").get("boundary_D")
-    config_path_funs = boundary_D_callable.split(":")[0]
-    # 2. Convert dots to slashes to create a path
-    return Path(config_path_funs.replace(".", "/"))
