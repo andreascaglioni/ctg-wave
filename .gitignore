@@ -6,6 +6,7 @@ results/
 CTG_parabolic/
 delete/
 results/
+results_tests/
 
 tmp.py
 *.csv
