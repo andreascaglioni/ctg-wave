@@ -28,7 +28,7 @@ Example:
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import yaml
-from typing import Callable, Any, Union, Optional
+from typing import Callable, Any, Union
 from importlib import import_module
 from functools import partial
 import numpy as np
@@ -79,9 +79,10 @@ def _resolve_callable(v: Union[str, dict, Callable]) -> Callable:
         path = v
         params = {}
     elif isinstance(v, dict):
-        path_or_none: Optional[str] = v.get("path") or v.get("target") or v.get("func")
+        path_or_none: str | None = v.get("path") or v.get("target") or v.get("func")
         if not path_or_none:
             raise ValueError("dict spec must include 'path'")
+        path = path_or_none
         params = v.get("params", {})
     else:
         raise TypeError("Expected callable | str | dict with 'path'")

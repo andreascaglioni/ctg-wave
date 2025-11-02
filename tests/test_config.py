@@ -2,7 +2,7 @@ import numpy as np
 import sys
 
 sys.path.insert(0, "./")
-from ctg.config import load_config
+from ctg.config import load_config, _resolve_callable
 
 
 def test_load_data_from_yaml(mini_yaml_path):
@@ -43,3 +43,8 @@ def test_config_resolves_callables(mini_yaml_path):
         y = f(X)
         assert y.shape == x.shape
         assert np.isfinite(y).all()
+
+
+def test_resolve_callable_string_and_dict():
+    f = _resolve_callable("numpy:sin")
+    assert callable(f) and abs(f(0.0)) < 1e-15
