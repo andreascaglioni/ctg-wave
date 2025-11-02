@@ -1,4 +1,4 @@
-# CTG_wave
+# CTG-wave: Continuous Time Galerkin for the (stochastic) wave equation
 
 Continuous-Time Galerkin (CTG) space-time finite element method (FEM) for deterministic and stochastic wave equations.
 
