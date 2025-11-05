@@ -96,7 +96,7 @@ More examples are available in the `examples/` directory:
 - `examples/SWE_example_ensamble.py` - Ensemble simulation example
 
 ## Documentation
-The documentation contains detailed API reference and mathematical background.
+The documentation contains detailed API reference and mathematical background. Find it at https://andreascaglioni.github.io/ctg-wave/
 
 
 
