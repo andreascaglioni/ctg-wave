@@ -1,0 +1,18 @@
+# Minimal requirements to build the docs for CTG-wave.
+# Install into your docs virtualenv:
+#   python -m pip install -r docs/requirements.txt
+
+# Ensure runtime deps required by modules imported in the docs
+pydantic>=2
+
+# Sphinx and recommended extensions
+sphinx>=7.0
+pydata-sphinx-theme
+sphinx-autodoc-typehints
+sphinx-mdinclude
+sphinx-copybutton
+sphinxcontrib-spelling
+
+# Optional: if you use autosummary with generated pages at build time
+# (we already enabled autosummary_generate in conf.py), the base sphinx
+# package provides autosummary via sphinx.ext.autosummary.

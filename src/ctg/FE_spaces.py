@@ -1,3 +1,14 @@
+"""Finite-element spaces and small helpers used by the CTG solver.
+
+This module provides lightweight wrappers around the Dolfinx function
+spaces and the small utilities required to assemble space, time and
+space-time operators used by the CTG implementation.
+
+Only a subset of behaviour is implemented here (Lagrangian FE and scalar
+fields) — the public classes are :class:`SpaceFE`, :class:`TimeFE` and
+:class:`SpaceTimeFE`.
+"""
+
 from dolfinx import fem
 from dolfinx.fem.petsc import assemble_matrix
 import numpy as np
@@ -9,6 +20,14 @@ from ctg.utils import cart_prod_coords
 
 
 class SpaceFE:
+    """Finite-element space in the spatial domain.
+
+    Args:
+        V: A Dolfinx FunctionSpace for the spatial domain (scalar codomain).
+        boundary_D: Optional geometrical marker used to compute Dirichlet
+            boundary dofs.
+    """
+
     def __init__(self, V: fem.FunctionSpace, boundary_D=None):
         # Sanity check input
         assert V.value_size == 1, f"SpaceFE: Condomain of V must be 1D, not {V.value_size}"
@@ -26,6 +45,11 @@ class SpaceFE:
             self.compute_bd_dofs(boundary_D)
 
     def assemble_matrices(self):
+        """Assemble standard FE matrices (mass and laplace).
+
+        The matrices are stored in :attr:`self.matrix` under keys
+        ``"mass"`` and ``"laplace"``.
+        """
         u = ufl.TrialFunction(self.V)
         phi = ufl.TestFunction(self.V)
         self.form["laplace"] = fem.form(ufl.inner(ufl.grad(u), ufl.grad(phi)) * ufl.dx)
@@ -40,6 +64,11 @@ class SpaceFE:
             )
 
     def compute_bd_dofs(self, boundary_D):
+        """Compute an indicator vector for Dirichlet boundary dofs.
+
+        The resulting vector ``self.boundary_dof_vector`` contains ones at
+        boundary dof indices and zeros elsewhere.
+        """
         u_D = fem.Function(self.V)
         u_D.interpolate(
             lambda x: 0.0 * x[0]
@@ -55,6 +84,12 @@ class SpaceFE:
 class TimeFE:
     # use assemble_matrices_W(W_t) to assemble W_mass, WW_mass
     def __init__(self, V, verbose=False):
+        """Finite-element space in the temporal domain.
+
+        Args:
+            V: A Dolfinx FunctionSpace defined on a 1D time mesh.
+            verbose: If True, print informative messages during assembly.
+        """
         assert V.value_size == 1, f"TimeFE: Codomain FE space ust be 1 not {V.value_size}"
         self.form = {}
         self.matrix = {}
@@ -84,7 +119,11 @@ class TimeFE:
         self.matrix[name] = scipy.sparse.csr_matrix(dl_mat_curr2, shape=(self.n_dofs, self.n_dofs))
 
     def assemble_matrices_0(self):
-        """Assemble W-independent matrices."""
+        """Assemble W-independent time matrices (mass, derivative).
+
+        These are stored in :attr:`self.matrix` and used by
+            :class:`SpaceTimeFE` to form tensor-product operators.
+        """
         u = ufl.TrialFunction(self.V)
         phi = ufl.TestFunction(self.V)
         # Mass
@@ -98,7 +137,12 @@ class TimeFE:
         self._add_form_matrix("derivative", f)
 
     def assemble_matrices_W(self, W_t=None):
-        """Assemble all W-depndent mantrices. W_t is a callable."""
+        """Assemble time matrices that depend on the coefficient W_t.
+
+        Args:
+            W_t: Callable evaluated at time dofs. If ``None`` the method is
+                a no-op.
+        """
         if W_t is None:
             if self.verbose:
                 print("TimeFE Warning: W_t is None. Skiping assembly W_dependent operators.")
@@ -117,7 +161,12 @@ class TimeFE:
 
 
 class SpaceTimeFE:
-    """Stores and computes space-time operators. No boundary and initial conditions."""
+    """Space-time FE container and operator assembler.
+
+    This class couples a :class:`SpaceFE` and a :class:`TimeFE` and
+    constructs the tensor-product matrices used by the CTG solver. Use
+    :meth:`update_time_fe` to move between time slabs.
+    """
 
     def __init__(self, space_fe: SpaceFE, time_fe: "TimeFE | None" = None, verbose: bool = False):
 

@@ -1,17 +1,26 @@
+"""Brownian motion helper utilities.
+
+This module provides a compact implementation of the Levy–Ciesielski
+expansion used to sample Brownian paths from a finite set of parameters.
+The functions are intentionally small and deterministic which makes them
+useful for tests and reproducibility.
+"""
+
 import numpy as np
 from math import ceil, log, sqrt
 
 
 def param_LC_W(yy, tt, T):
-    """Computation of the LC expansion of the Wiener process.
+    """Compute Levy–Ciesielski expansion samples of Brownian motion.
 
     Args:
-        yy (numpy.ndarray[float]): Parameter vector for the expansion.
-        tt (numpy.ndarray[float]): 1D array of discrete times in [0, T].
-        T (float): Final time of approximation.
+        yy: Parameter vector or array used to construct sample paths.
+        tt: 1D array of time points in [0, T] where the paths are evaluated.
+        T: Final time for the expansion (used for rescaling).
 
     Returns:
-        numpy.ndarray[float]: 2D array. Each *ROW* is a sample path of W over tt.
+        2D numpy array where each row is a sampled Brownian path evaluated
+        at the times in ``tt``.
     """
 
     # Make yy 2D array (Ny, dimy)

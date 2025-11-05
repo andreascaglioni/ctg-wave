@@ -198,14 +198,7 @@ class physicsCfg(BaseModel):
     )
     @classmethod
     def resolve_callables(cls, v):
-        """Resolve string/dict references to actual callable functions.
-
-        Args:
-            v: Input value (callable, string, or dict).
-
-        Returns:
-            Callable: The resolved callable function.
-        """
+        """Resolve a callable specified as a callable, string, or dict."""
         return _resolve_callable(v)
 
 
@@ -247,14 +240,7 @@ class numericsCfg(BaseModel):
     @field_validator("comm", mode="before")
     @classmethod
     def resolve_comm(cls, v):
-        """Resolve MPI communicator from string path or return as-is.
-
-        Args:
-            v: Input value (MPI.Comm object or string path).
-
-        Returns:
-            MPI.Comm: The resolved MPI communicator.
-        """
+        """Resolve an MPI communicator from a string path or return it."""
         if isinstance(v, str):
             # split "module:attribute"
             if ":" in v:
@@ -282,19 +268,23 @@ class AppConfig(BaseModel):
         physics: Physics configuration (initial/boundary conditions, forcing).
         numerics: Numerical discretization configuration.
 
-    Example:
-        >>> # Create with defaults
-        >>> config = AppConfig()
+    Example::
 
-        >>> # Load from YAML
-        >>> config = load_config(Path("config.yaml"))
+        # Create with defaults
+        config = AppConfig()
 
-        >>> # Create programmatically
-        >>> config = AppConfig(
-        ...     physics={"initial_data_u": "data.funcs:my_initial_u"},
-        ...     numerics={"n_cells_space": 200, "end_time": 2.0}
-        ... )
+        # Load from YAML
+        config = load_config(Path("config.yaml"))
+
+        # Create programmatically
+        config = AppConfig(
+            physics={"initial_data_u": "data.funcs:my_initial_u"},
+            numerics={"n_cells_space": 200, "end_time": 2.0},
+        )
     """
+
+    # Tighten type-checks and allowed variables
+    model_config = ConfigDict(extra="forbid", frozen=True, validate_default=True)
 
     physics: physicsCfg = Field(default_factory=physicsCfg, description="Physics configuration")
     numerics: numericsCfg = Field(

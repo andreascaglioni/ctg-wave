@@ -7,6 +7,9 @@ CTG_parabolic/
 delete/
 results/
 results_tests/
+docs/_build/
+docs/_autosummary/
+docs/generated/
 
 tmp.py
 *.csv

@@ -1,3 +1,10 @@
+"""Error computation helpers for CTG solutions.
+
+The functions in this module provide utilities to compute L2/H1 and
+temporal norms of the error by interpolating the numerical solution on a
+refined space-time mesh and comparing it with the exact solution.
+"""
+
 import numpy as np
 from ctg.FE_spaces import SpaceFE, TimeFE, SpaceTimeFE
 from ctg.utils import cart_prod_coords
@@ -12,6 +19,23 @@ from math import sqrt
 
 
 def compute_error_slab(sol_slab, exact_sol, space_time_fe, err_type_x, err_type_t):
+    """Compute spatial/temporal error for a single time slab.
+
+    The numerical solution is interpolated on a refined space-time grid
+    and compared to ``exact_sol``. Supported spatial norms are ``l2`` and
+    ``h1``, and temporal measures are ``l2`` and ``linf``.
+
+    Args:
+        sol_slab: Flattened numerical solution for the slab.
+        exact_sol: Callable returning exact solution values at query points.
+        space_time_fe: Instance of :class:`SpaceTimeFE` for the slab.
+        err_type_x: Spatial error type, either ``'l2'`` or ``'h1'``.
+        err_type_t: Temporal error aggregation, either ``'l2'`` or ``'linf'``.
+
+    Returns:
+        Tuple ``(err, norm_u)`` where ``err`` is the chosen error metric and
+        ``norm_u`` is the corresponding norm of the numerical solution.
+    """
 
     # refine Time
 
@@ -67,6 +91,21 @@ def compute_error_slab(sol_slab, exact_sol, space_time_fe, err_type_x, err_type_
 
 
 def compute_err(comm, order_t, err_type_x, err_type_t, time_slabs, space_fe, sol_slabs, sol_exa):
+    """Compute aggregated error over all time slabs.
+
+    Args:
+        comm: MPI communicator used to create temporal meshes.
+        order_t: Temporal FE degree used for refinement in error estimates.
+        err_type_x: Spatial error type ('l2' or 'h1').
+        err_type_t: Temporal aggregation ('l2' or 'linf').
+        time_slabs: List of slab tuples produced by the solver.
+        space_fe: Spatial FE object used by the solver.
+        sol_slabs: List of per-slab numerical solutions.
+        sol_exa: Exact solution callable used for comparison.
+
+    Returns:
+        Tuple ``(total_err, total_rel_err, err_slabs, norm_u_slabs)``.
+    """
 
     err_slabs = -1.0 * np.ones(len(time_slabs))
     norm_u_slabs = -1.0 * np.ones_like(err_slabs)

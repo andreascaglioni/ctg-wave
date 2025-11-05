@@ -1,17 +1,23 @@
+"""High-level assembler for the CTG space-time linear systems.
+
+This module contains :class:`AssemblerWave` which combines the
+space-time operators produced by :class:`ctg.FE_spaces.SpaceTimeFE` and
+applies initial/boundary conditions to produce a linear system ready for
+the solver.
+"""
+
 import numpy as np
 import scipy
 from ctg.FE_spaces import SpaceTimeFE
 
 
 class AssemblerWave:
-    """Assembles linear system for the CTG space-time solver. In particular:
-    * Get operators from SpaceTimeFE
-    * Impose initial and boundary conditions to compute the homogeneous system (to be solved) an the lifting function.
+    """Assembler for a single space-time slab.
 
-    Some attributes are set only upon construction: space_fe, exact_rhs_0, exact_rhs_1, boundary_data_u, boundary_data_v, initial_data_u, initial_data_v.
-    Others, are set by setter methods because they will change over time slabs or over parameters:
-        * Changing over time slabs: X0, time_fe
-        * Changing over parameters: Ay, A"""
+    The class exposes small helper methods to build the parameter
+    independent and dependent parts of the operator and to impose
+    initial/boundary conditions.
+    """
 
     def __init__(self, space_time_fe: SpaceTimeFE, verbose: bool = False):
 

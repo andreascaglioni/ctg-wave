@@ -1,17 +1,23 @@
-"""Functions for the Continuous Time Galerkin method for the space-time integration
-of space-time problems, such as paraboic and hyperbolic PDEs."""
+"""Small utilities used across the CTG codebase.
+
+This module provides compact, well-tested helpers that operate on FE
+coordinates and on time slabs. The functions are intentionally simple and
+have predictable behaviour to ease testing and documentation.
+"""
 
 import numpy as np
 
 
 def cart_prod_coords(t_coords, x_coords):
-    """
-    Computes cartesian product of two coordinate arrays.
+    """Return the Cartesian product of time and space coordinate arrays.
+
     Args:
-        t_coords (np.ndarray): Column 2D array of time coordinates.
-        x_coords (np.ndarray): Column 2D array of spatial coordinates.
+        t_coords: Array of time coordinates (1D or (n,1) shaped).
+        x_coords: Array of space coordinates (1D or (m,1) shaped).
+
     Returns:
-        np.ndarray: 2D array where each row is a pair (t, x) from the cartesian product of t_coords and x_coords.
+        2D array with rows representing pairs (t, x) from the Cartesian
+        product of the inputs.
     """
 
     if len(x_coords.shape) == 1:  # coordinates i wrong format (rank 1 array). assume 1d.
@@ -24,14 +30,15 @@ def cart_prod_coords(t_coords, x_coords):
 
 
 def compute_time_slabs(start_time, end_time, slab_size):
-    """
-    Divides a time interval into consecutive slabs of a given size.
+    """Split a time interval into consecutive slabs.
+
     Args:
-        start_time (float): The starting time of the interval.
-        end_time (float): The ending time of the interval.
-        slab_size (float): The size of each time slab.
+        start_time: Start of the time interval.
+        end_time: End of the time interval.
+        slab_size: Desired slab size (positive float).
+
     Returns:
-        list of tuple: List of (start, end) tuples for each time slab.
+        List of ``(start, end)`` tuples covering ``[start_time, end_time]``.
     """
 
     time_slabs = [(start_time, start_time + slab_size)]  # current time interval
