@@ -2,6 +2,18 @@
 
 Continuous-Time Galerkin (CTG) space-time finite element method (FEM) for deterministic and stochastic wave equations.
 
+<table>
+  <tr>
+    <td><img src="docs/_static/xt_slabs.png" alt="Space-time slabs"></td>
+    <td><img src="docs/_static/solution_xt.png" alt="Solution over space–time"></td>
+  </tr>
+  <tr>
+    <td align="center">Space‑time slabs</td>
+    <td align="center">Solution over space–time</td>
+  </tr>
+</table>
+
+
 ## Table of Contents
 - [Features](#features)
 - [QuickStart](#quickstart)

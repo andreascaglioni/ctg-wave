@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
+from ctg.FE_spaces import SpaceFE
 from ctg.utils import cart_prod_coords
 
 
@@ -101,3 +101,53 @@ def float_f(x):
         str: Formatted float as a string.
     """
     return f"{x:.4e}"
+
+
+def plot_xt_slabs(space_fe: SpaceFE, time_slabs):
+
+    text_size = 14
+
+    min_x = np.amin(space_fe.dofs)
+    max_x = np.amax(space_fe.dofs)
+    tt = [slab[0] for slab in time_slabs]
+    tt.append(time_slabs[-1][1])
+    min_t = np.amin(tt)
+    max_t = np.amax(tt)
+
+    plt.figure("xt_slabs")
+    ax = plt.gca()
+    ax.set_aspect(2)
+    # Move y-axis to the right and put ticks/labels inside the plot
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position("right")
+    # Show tick labels on the right only, draw ticks inward (into axes)
+    ax.tick_params(axis="y", which="both", direction="in", labelright=True, labelleft=False)
+    # Draw space-time slabs
+    for x in [min_x, max_x]:
+        ax.plot([x, x], [min_t, max_t], linewidth=2, color="black")
+    for i, t in enumerate(tt):
+        ax.plot([min_x, max_x], [t, t], linewidth=2, color="black")
+
+    # Add annotations
+    for i, t in enumerate(tt[:-1]):
+        x_c = (min_x + max_x) / 2
+        t_c = (tt[i] + tt[i + 1]) / 2
+        ax.text(
+            x_c,
+            t_c,
+            f"Slab {i}",
+            horizontalalignment="center",
+            verticalalignment="center",
+            fontsize=text_size,
+            bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"),
+        )
+    ax.set_xlabel("Space domain D", fontsize=text_size + 4)
+    ax.set_ylabel("Time domain", fontsize=text_size + 4, labelpad=-10)
+    ax.set_xticks([])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels([])
+    ax.set_yticklabels(["0", "T"], fontsize=text_size + 4)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    plt.tight_layout()
