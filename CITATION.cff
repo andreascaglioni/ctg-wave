@@ -5,11 +5,9 @@ abstract: "A Python object-oriented code for solving parametric wave equations u
 authors:
   - family-names: "Scaglioni"
     given-names: "Andrea"
-    # affiliation: "YourInstitution"
     orcid: "https://orcid.org/0000-0002-8601-5902"
 date-released: "2025-10-30"
 version: "0.1.0"
-# doi: "10.5281/zenodo.1234567"
 license: "MIT"
 repository-code: "https://github.com/andreascaglioni/CTG_wave"
 url: "https://github.com/andreascaglioni/CTG_wave"
